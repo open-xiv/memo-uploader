@@ -1,0 +1,11 @@
+{
+  "Author": "Haku",
+  "Name": "SuMemo Uploader",
+  "Punchline": "将战斗记录同步到 SuMemo",
+  "Description": "SuMemo 支持的记录上传工具",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "sumemo",
+    "haku"
+  ]
+}

@@ -1,0 +1,28 @@
+﻿<Project Sdk="Dalamud.CN.NET.Sdk/12.0.2">
+    <PropertyGroup>
+        <Version>0.0.0.1</Version>
+        <Description>SuMemo Uploader</Description>
+        <PackageProjectUrl>https://github.com/open-xiv/MemoUploader</PackageProjectUrl>
+        <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+        <IsPackable>false</IsPackable>
+        <RootNamespace>MemoUploader</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Content Include=".editorconfig"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\OmenTools\OmenTools.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Folder Include="Models\"/>
+    </ItemGroup>
+</Project>
