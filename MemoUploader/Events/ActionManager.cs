@@ -1,12 +1,14 @@
-﻿using Dalamud.Hooking;
+﻿using System;
+using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using MemoUploader.Models;
 
 
 namespace MemoUploader.Events;
 
-public unsafe class ActionManager(Plugin plugin)
+public unsafe class ActionManager(Action<IEvent> eventRaiser)
 {
     private static readonly CompSig                    actionStartSig = new("E8 ?? ?? ?? ?? E9 ?? ?? ?? ?? 48 89 BC 24 D0 00 00 00");
     private static          Hook<ActionStartDelegate>? actionStartHook;
@@ -25,18 +27,20 @@ public unsafe class ActionManager(Plugin plugin)
 
     public void Uninit()
     {
-        actionStartHook?.Disable();
         actionStartHook?.Dispose();
         actionStartHook = null;
 
-        actionCompletedHook?.Disable();
         actionCompletedHook?.Dispose();
         actionCompletedHook = null;
     }
 
     private nint OnActionStartDetour(BattleChara* player, ActionType type, uint actionId, nint a4, float rotation, float a6)
     {
-        plugin.EventQueue.Post(new ActionStart(player->EntityId, actionId));
+        if (player->ObjectKind is ObjectKind.BattleNpc)
+        {
+            if (DService.ObjectTable.SearchByEntityId(player->EntityId) is { } obj)
+                eventRaiser(new ActionStart(obj, actionId));
+        }
 
         if (actionStartHook is null)
             return nint.Zero;
@@ -47,7 +51,11 @@ public unsafe class ActionManager(Plugin plugin)
 
     private nint OnActionCompleteDetour(BattleChara* player, ActionType type, uint actionId, uint spellId, GameObjectId a5, nint a6, float rotation, short a8, int a9, int a10)
     {
-        plugin.EventQueue.Post(new ActionCompleted(player->EntityId, actionId));
+        if (player->ObjectKind is ObjectKind.BattleNpc)
+        {
+            if (DService.ObjectTable.SearchByEntityId(player->EntityId) is { } obj)
+                eventRaiser(new ActionCompleted(obj, actionId));
+        }
 
         if (actionCompletedHook is null)
             return nint.Zero;

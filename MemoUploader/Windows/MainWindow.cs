@@ -1,19 +1,33 @@
 ﻿using System;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Windowing;
+using MemoUploader.Api;
+using MemoUploader.Engine;
+using MemoUploader.Models;
 
 
 namespace MemoUploader.Windows;
 
 public class MainWindow : Window, IDisposable
 {
-    private readonly Plugin plugin;
-    private          Tab    currentTab = Tab.Status;
+    // props
+    private readonly Configuration config;
+    private readonly RuleEngine    engine;
 
-    public MainWindow(Plugin plugin) : base("SuMemo Uploader##sumemo-uploader-main", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+    // window
+    private Tab currentTab = Tab.Status;
+
+    // event recorder
+    private string eventFilter = string.Empty;
+
+    public MainWindow(Configuration config, RuleEngine engine) : base("SuMemo Uploader##sumemo-uploader-main", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
-        this.plugin = plugin;
+        // props
+        this.config = config;
+        this.engine = engine;
 
+        // window
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(375, 330),
@@ -42,13 +56,13 @@ public class MainWindow : Window, IDisposable
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
 
-        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(10, 10)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(16, 16)))
         using (ImRaii.Child("SidebarChild", Vector2.Zero, true, ImGuiWindowFlags.NoScrollbar))
             DrawSidebar();
 
         ImGui.TableNextColumn();
 
-        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(10, 10)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(24, 24)))
         using (ImRaii.Child("ContentChild", Vector2.Zero, true))
             DrawContent();
     }
@@ -61,7 +75,9 @@ public class MainWindow : Window, IDisposable
         if (ImGuiOm.SelectableTextCentered("设置", currentTab == Tab.Settings))
             currentTab = Tab.Settings;
 
+        ImGui.Spacing();
         ImGui.Separator();
+        ImGui.Spacing();
 
         if (ImGuiOm.SelectableTextCentered("事件", currentTab == Tab.EventQueue))
             currentTab = Tab.EventQueue;
@@ -86,32 +102,93 @@ public class MainWindow : Window, IDisposable
             case Tab.Listeners:
                 DrawListenersTab();
                 break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
 
     private void DrawSettingsTab()
     {
         ImGui.Text("设置");
+
+        ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        var enableUpload = plugin.Config.EnableUpload;
+        var enableUpload = config.EnableUpload;
         if (ImGuiOm.CheckboxColored("进度上传", ref enableUpload))
         {
-            plugin.Config.EnableUpload = enableUpload;
-            plugin.Config.Save();
+            config.EnableUpload    = enableUpload;
+            ApiClient.EnableUpload = enableUpload;
+            config.Save();
         }
     }
 
-    private void DrawStatusTab() { }
+    private void DrawStatusTab()
+    {
+        // engine status
+        ImGui.TextColored(LightSkyBlue, "解析引擎");
+        ImGui.SameLine();
+        var color = engine.State switch
+        {
+            EngineState.Ready => Gold,
+            EngineState.InProgress => LimeGreen,
+            EngineState.Completed => DeepSkyBlue,
+            _ => Tomato
+        };
+        var slug = engine.State switch
+        {
+            EngineState.Ready => "准备就绪",
+            EngineState.InProgress => "解析中",
+            EngineState.Completed => "完成解析",
+            _ => "关闭"
+        };
+        ImGui.TextColored(color, $"{slug}");
+    }
 
     private void DrawEventQueueTab()
     {
+        ImGui.InputTextWithHint("##sumemo-event-filter", "筛选事件", ref eventFilter, 100);
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         ImGui.BeginChild("EventHistoryChild", Vector2.Zero, false);
         {
-            var recentEvents = plugin.Engine.EventHistory;
-            foreach (var evt in recentEvents)
-                ImGui.TextUnformatted(evt);
+            if (ImGui.BeginTable("EventLogTable", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit))
+            {
+                ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 90);
+                ImGui.TableSetupColumn("Category", ImGuiTableColumnFlags.WidthFixed, 150);
+                ImGui.TableSetupColumn("Message", ImGuiTableColumnFlags.WidthStretch);
+
+                // filter events
+                var events = engine.EventHistory;
+                var showEvents = string.IsNullOrWhiteSpace(eventFilter)
+                                     ? events
+                                     : events.Where(log =>
+                                                        log.Category.Contains(eventFilter, StringComparison.OrdinalIgnoreCase) ||
+                                                        log.Message.Contains(eventFilter, StringComparison.OrdinalIgnoreCase)
+                                     ).ToList();
+
+                foreach (var evt in showEvents)
+                {
+                    ImGui.TableNextRow();
+
+                    // time
+                    ImGui.TableNextColumn();
+                    ImGui.Text(evt.Time.ToLocalTime().ToString("HH:mm:ss.fff"));
+
+                    // category
+                    ImGui.TableNextColumn();
+                    ImGui.Text(evt.Category);
+
+                    // message
+                    ImGui.TableNextColumn();
+                    ImGui.Text(evt.Message);
+                }
+                ImGui.EndTable();
+            }
         }
         ImGui.EndChild();
     }

@@ -1,9 +1,9 @@
-﻿using System.Threading.Tasks.Dataflow;
-using Dalamud.Game.Command;
+﻿using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using MemoUploader.Api;
 using MemoUploader.Engine;
 using MemoUploader.Events;
 using MemoUploader.Windows;
@@ -16,11 +16,8 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/smm";
 
     // service
-    public readonly RuleEngine Engine;
-
-    // shared across service
-    public readonly ActionBlock<IEvent> EventQueue;
-    public readonly EventManager        EventService;
+    private readonly RuleEngine   engine;
+    private readonly EventManager eventService;
 
     // plugin windows
     public readonly WindowSystem WindowSystem = new("MemoUploader");
@@ -29,17 +26,20 @@ public sealed class Plugin : IDalamudPlugin
     {
         Config = pi.GetPluginConfig() as Configuration ?? new Configuration();
         DService.Init(pi);
+        ApiClient.EnableUpload = Config.EnableUpload;
 
         // engine
-        Engine     = new RuleEngine();
-        EventQueue = new ActionBlock<IEvent>(Engine.ProcessEventAsync, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
+        engine = new RuleEngine();
 
         // services
-        EventService = new EventManager(this);
-        EventService.Init();
+        eventService = new EventManager();
+        eventService.Init();
+
+        // link engine and services
+        eventService.OnEvent += engine.PostEvent;
 
         // window
-        MainWindow = new MainWindow(this);
+        MainWindow = new MainWindow(Config, engine);
         WindowSystem.AddWindow(MainWindow);
 
         // command
@@ -49,7 +49,27 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.OpenMainUi += ToggleMainUI;
     }
 
-    public Configuration Config { get; init; }
+    public void Dispose()
+    {
+        // command
+        CommandManager.RemoveHandler(CommandName);
+
+        // window
+        WindowSystem.RemoveAllWindows();
+        MainWindow.Dispose();
+
+        // unlink engine and services
+        eventService.OnEvent -= engine.PostEvent;
+
+        // services
+        eventService.Uninit();
+
+        DService.Uninit();
+    }
+
+    #region props
+
+    private Configuration Config { get; init; }
 
     [PluginService]
     internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -65,25 +85,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private MainWindow MainWindow { get; init; }
 
-    public void Dispose()
-    {
-        // command
-        CommandManager.RemoveHandler(CommandName);
-
-        // window
-        WindowSystem.RemoveAllWindows();
-        MainWindow.Dispose();
-
-        // services
-        EventService.Uninit();
-
-        // engine
-        EventQueue.Complete();
-        EventQueue.Completion.Wait();
-
-        DService.Uninit();
-    }
-
+    #endregion
 
     private void OnCommand(string command, string args)
         => ToggleMainUI();
