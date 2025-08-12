@@ -103,7 +103,7 @@ resharper_suggest_var_or_type_simple_types_highlighting = hint
 resharper_unused_auto_property_accessor_global_highlighting = none
 csharp_style_deconstructed_variable_declaration = true:silent
 
-# 表达式体
+# expression
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 csharp_style_expression_bodied_properties = when_on_single_line:suggestion
 csharp_style_expression_bodied_constructors = when_on_single_line:suggestion

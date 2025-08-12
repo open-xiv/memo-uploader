@@ -1,10 +1,12 @@
-﻿using Dalamud.Hooking;
+﻿using System;
+using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using MemoUploader.Models;
 
 
 namespace MemoUploader.Events;
 
-public unsafe class StatusManager(Plugin plugin)
+public unsafe class StatusManager(Action<IEvent> eventRaiser)
 {
     private static readonly CompSig                      statusAppliedSig = new("E8 ?? ?? ?? ?? 80 BC 24 C0 00 00 00 00");
     private static          Hook<StatusAppliedDelegate>? statusAppliedHook;
@@ -23,11 +25,9 @@ public unsafe class StatusManager(Plugin plugin)
 
     public void Uninit()
     {
-        statusAppliedHook?.Disable();
         statusAppliedHook?.Dispose();
         statusAppliedHook = null;
 
-        statusRemovedHook?.Disable();
         statusRemovedHook?.Dispose();
         statusRemovedHook = null;
     }
@@ -35,15 +35,27 @@ public unsafe class StatusManager(Plugin plugin)
     private void OnStatusAppliedDetour(BattleChara** player, ushort statusId, float remainingTime, ushort statusParam, ulong sourceId, ushort stackCount)
     {
         statusAppliedHook?.Original(player, statusId, remainingTime, statusParam, sourceId, stackCount);
-        if (statusId != 0)
-            plugin.EventQueue.Post(new StatusApplied((*player)->EntityId, statusId));
+        if (statusId == 0)
+            return;
+
+        try { eventRaiser(new StatusApplied((*player)->EntityId, statusId)); }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void OnStatusRemovedDetour(BattleChara** player, ushort statusId, ushort statusParam, ulong sourceId, ushort stackCount)
     {
         statusRemovedHook?.Original(player, statusId, statusParam, sourceId, stackCount);
-        if (statusId != 0)
-            plugin.EventQueue.Post(new StatusRemoved((*player)->EntityId, statusId));
+        if (statusId == 0)
+            return;
+
+        try { eventRaiser(new StatusRemoved((*player)->EntityId, statusId)); }
+        catch
+        {
+            // ignored
+        }
     }
 
     private delegate void StatusAppliedDelegate(BattleChara** player, ushort statusId, float remainingTime, ushort statusParam, ulong sourceId, ushort stackCount);

@@ -1,14 +1,19 @@
-﻿using Dalamud.Game.ClientState.Conditions;
+﻿using System;
+using Dalamud.Game.ClientState.Conditions;
+using MemoUploader.Models;
 
 
 namespace MemoUploader.Events;
 
-public class EventManager(Plugin plugin)
+public class EventManager
 {
     // service
-    public ActionManager?    ActionService;
-    public CombatantManager? CombatantService;
-    public StatusManager?    StatusService;
+    private ActionManager?    actionService;
+    private CombatantManager? combatantService;
+    private StatusManager?    statusService;
+
+    // event
+    public event Action<IEvent>? OnEvent;
 
     public void Init()
     {
@@ -16,16 +21,16 @@ public class EventManager(Plugin plugin)
         DService.ClientState.TerritoryChanged += OnTerritoryChanged;
 
         // ACTION EVENTS
-        ActionService = new ActionManager(plugin);
-        ActionService.Init();
+        actionService = new ActionManager(RaiseEvent);
+        actionService.Init();
 
         // COMBATANT EVENTS
-        CombatantService = new CombatantManager(plugin);
-        CombatantService.Init();
+        combatantService = new CombatantManager(RaiseEvent);
+        combatantService.Init();
 
         // STATUS EVENTS
-        StatusService = new StatusManager(plugin);
-        StatusService.Init();
+        statusService = new StatusManager(RaiseEvent);
+        statusService.Init();
 
         // DUTY EVENTS
         DService.DutyState.DutyStarted     += OnDutyStarted;
@@ -43,13 +48,13 @@ public class EventManager(Plugin plugin)
         DService.ClientState.TerritoryChanged -= OnTerritoryChanged;
 
         // ACTION EVENTS
-        ActionService?.Uninit();
+        actionService?.Uninit();
 
         // COMBATANT EVENTS
-        CombatantService?.Uninit();
+        combatantService?.Uninit();
 
         // STATUS EVENTS
-        StatusService?.Uninit();
+        statusService?.Uninit();
 
         // DUTY EVENTS
         DService.DutyState.DutyStarted     -= OnDutyStarted;
@@ -61,26 +66,29 @@ public class EventManager(Plugin plugin)
         DService.Condition.ConditionChange -= OnConditionChange;
     }
 
+    private void RaiseEvent(IEvent e)
+        => OnEvent?.Invoke(e);
+
     private void OnTerritoryChanged(ushort zoneId)
-        => plugin.EventQueue.Post(new TerritoryChanged(zoneId));
+        => RaiseEvent(new TerritoryChanged(zoneId));
 
     private void OnDutyStarted(object? sender, ushort e)
-        => plugin.EventQueue.Post(new DutyStarted());
+        => RaiseEvent(new DutyStarted());
 
     private void OnDutyRecommenced(object? sender, ushort e)
-        => plugin.EventQueue.Post(new DutyRecommenced());
+        => RaiseEvent(new DutyRecommenced());
 
     private void OnDutyCompleted(object? sender, ushort e)
-        => plugin.EventQueue.Post(new DutyCompleted());
+        => RaiseEvent(new DutyCompleted());
 
     private void OnDutyWiped(object? sender, ushort e)
-        => plugin.EventQueue.Post(new DutyWiped());
+        => RaiseEvent(new DutyWiped());
 
     private void OnConditionChange(ConditionFlag flag, bool value)
     {
         if (flag is not ConditionFlag.InCombat)
             return;
 
-        plugin.EventQueue.Post(value ? new CombatOptIn() : new CombatOptOut());
+        RaiseEvent(value ? new CombatOptIn() : new CombatOptOut());
     }
 }

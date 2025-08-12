@@ -1,25 +1,47 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using MemoUploader.Events;
+using System.Threading.Tasks.Dataflow;
+using MemoUploader.Api;
+using MemoUploader.Models;
 
 
 namespace MemoUploader.Engine;
 
 public class RuleEngine
 {
+    // event queue
+    private readonly ActionBlock<IEvent> eventQueue;
+
     // event history
-    private const    int                     MaxEventHistory = 80;
-    private readonly ConcurrentQueue<string> eventHistory    = [];
-    public           IEnumerable<string>     EventHistory => eventHistory.ToArray();
+    private readonly EventRecorder eventHistory = new(1000);
+
+    // fight context
+    private FightContext? fightContext;
+    public  EngineState?  State => fightContext?.Lifecycle;
+
+    public RuleEngine()
+        => eventQueue = new ActionBlock<IEvent>(ProcessEventAsync, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
+
+    public IReadOnlyList<EventLog> EventHistory => eventHistory.GetSnap();
+
+    public void PostEvent(IEvent e)
+        => eventQueue.Post(e);
 
     public async Task ProcessEventAsync(IEvent e)
     {
         // event logs
-        var eventString = $"[{DateTime.Now:HH:mm:ss.fff}] {e}";
-        eventHistory.Enqueue(eventString);
-        while (eventHistory.Count > MaxEventHistory)
-            eventHistory.TryDequeue(out _);
+        eventHistory.Record(e);
+
+        if (e is TerritoryChanged tc)
+        {
+            fightContext?.CompletedSnap();
+            fightContext?.Uninit();
+
+            var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.ZoneId);
+            fightContext = dutyConfig is not null ? new FightContext(PostEvent, dutyConfig) : null;
+            fightContext?.Init();
+        }
+
+        fightContext?.ProcessEvent(e);
     }
 }
