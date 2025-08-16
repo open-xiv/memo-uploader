@@ -22,10 +22,10 @@ public class DutyConfig
     public uint PartySize { get; set; }
 
     [JsonProperty("variables")]
-    public List<Variable> Variables { get; set; } = new();
+    public List<Variable> Variables { get; set; } = [];
 
     [JsonProperty("mechanics")]
-    public List<Mechanic> Mechanics { get; set; } = new();
+    public List<Mechanic> Mechanics { get; set; } = [];
 
     [JsonProperty("timeline")]
     public required Timeline Timeline { get; set; }
@@ -64,7 +64,7 @@ public class Mechanic
     public required Trigger Trigger { get; set; }
 
     [JsonProperty("actions")]
-    public List<Action> Actions { get; set; } = new();
+    public List<Action> Actions { get; set; } = [];
 }
 
 public class Timeline
@@ -73,7 +73,7 @@ public class Timeline
     public string StartPhase { get; set; } = string.Empty;
 
     [JsonProperty("phases")]
-    public List<Phase> Phases { get; set; } = new();
+    public List<Phase> Phases { get; set; } = [];
 }
 
 public class Phase
@@ -85,10 +85,10 @@ public class Phase
     public uint TargetId { get; set; }
 
     [JsonProperty("checkpoints")]
-    public List<string> Checkpoints { get; set; } = new();
+    public List<string> Checkpoints { get; set; } = [];
 
     [JsonProperty("transitions")]
-    public List<Transition> Transitions { get; set; } = new();
+    public List<Transition> Transitions { get; set; } = [];
 }
 
 public class Transition
@@ -97,7 +97,7 @@ public class Transition
     public string TargetPhase { get; set; } = string.Empty;
 
     [JsonProperty("conditions")]
-    public List<Trigger> Conditions { get; set; } = new();
+    public List<Trigger> Conditions { get; set; } = [];
 }
 
 public class Action
@@ -142,7 +142,7 @@ public class Trigger
     public string Operator { get; set; } = string.Empty;
 
     [JsonProperty("conditions")]
-    public List<Trigger> Conditions { get; set; } = new();
+    public List<Trigger> Conditions { get; set; } = [];
 
     [JsonProperty("expression")]
     public string Expression { get; set; } = string.Empty;
