@@ -129,14 +129,14 @@ public class MainWindow : Window, IDisposable
         // engine status
         ImGui.TextColored(LightSkyBlue, "解析引擎");
         ImGui.SameLine();
-        var color = engine.State switch
+        var color = engine.FightContext?.Lifecycle switch
         {
             EngineState.Ready => Gold,
             EngineState.InProgress => LimeGreen,
             EngineState.Completed => DeepSkyBlue,
             _ => Tomato
         };
-        var slug = engine.State switch
+        var slug = engine.FightContext?.Lifecycle switch
         {
             EngineState.Ready => "准备就绪",
             EngineState.InProgress => "解析中",
@@ -144,6 +144,23 @@ public class MainWindow : Window, IDisposable
             _ => "关闭"
         };
         ImGui.TextColored(color, $"{slug}");
+
+        // fight progress
+        if (engine.FightContext?.Lifecycle is EngineState.InProgress)
+        {
+            ImGui.TextColored(LightSkyBlue, "战斗进度");
+            ImGui.SameLine();
+            ImGui.TextColored(Gold, $"{engine.FightContext.CurrentPhase}");
+            ImGui.SameLine();
+            ImGui.TextColored(LightSkyBlue, $"({engine.FightContext.CurrentSubphase})");
+
+            foreach (var checkpoint in engine.FightContext.Checkpoints)
+            {
+                ImGui.TextColored(LightGreen, $"{checkpoint.Item1}");
+                ImGui.SameLine();
+                ImGui.TextColored(LightSkyBlue, checkpoint.Item2 ? "已完成" : "未完成");
+            }
+        }
     }
 
     private void DrawEventQueueTab()
@@ -193,7 +210,20 @@ public class MainWindow : Window, IDisposable
         ImGui.EndChild();
     }
 
-    private void DrawListenersTab() { }
+    private void DrawListenersTab()
+    {
+        if (engine.FightContext?.Lifecycle is not EngineState.InProgress)
+            return;
+
+        ImGui.TextColored(LightSkyBlue, "变量列表");
+
+        foreach (var variable in engine.FightContext.Variables)
+        {
+            ImGui.TextColored(LightSkyBlue, $"{variable.Key}");
+            ImGui.SameLine();
+            ImGui.TextColored(Gold, $"{variable.Value}");
+        }
+    }
 
     private enum Tab
     {
