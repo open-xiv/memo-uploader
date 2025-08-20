@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Conditions;
 using MemoUploader.Models;
 using Newtonsoft.Json;
 
@@ -37,7 +39,7 @@ public static class ApiClient
     /// <returns>Duty config if successful, otherwise null.</returns>
     public static async Task<DutyConfig?> FetchDutyConfigAsync(uint zoneId)
     {
-        var url = $"{BaseUrl}/duty/{zoneId}";
+        var url = $"{BaseUrl}/duty/{zoneId}?debug={RandomNumberGenerator.GetInt32(int.MaxValue)}";
         try
         {
             var resp = await client.GetAsync(url);
@@ -64,26 +66,26 @@ public static class ApiClient
         try
         {
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-            if (!EnableUpload)
+            if (!EnableUpload || DService.Condition[ConditionFlag.DutyRecorderPlayback])
             {
-                DService.Log.Debug($"{content}");
-                DService.Log.Debug("fight record uploaded canceled.");
+                DService.Log.Debug($"{content.ReadAsStringAsync().Result}");
+                DService.Log.Debug("Fight record uploaded canceled");
                 return true;
             }
 
             var resp = await client.PostAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.Created)
             {
-                DService.Log.Debug("fight record uploaded successfully.");
+                DService.Log.Debug("Fight record uploaded successfully");
                 return true;
             }
 
-            DService.Log.Error($"failed to upload fight record: {resp.StatusCode} {resp.ReasonPhrase}");
+            DService.Log.Error($"Failed to upload fight record: {resp.StatusCode} {resp.ReasonPhrase}");
             return false;
         }
         catch (Exception e)
         {
-            DService.Log.Error($"failed to upload fight record: {e.Message}");
+            DService.Log.Error($"Failed to upload fight record: {e.Message}");
             return false;
         }
     }

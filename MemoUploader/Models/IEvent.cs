@@ -9,7 +9,9 @@ namespace MemoUploader.Models;
 public interface IEvent
 {
     string Category => GetType().Name;
-    string Message  => ToString() ?? string.Empty;
+    string Message  => FormatMessage();
+
+    string FormatMessage() => ToString() ?? string.Empty;
 }
 
 public record EventLog(DateTime Time, string Category, string Message);

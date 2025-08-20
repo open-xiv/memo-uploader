@@ -16,8 +16,7 @@ public class RuleEngine
     private readonly EventRecorder eventHistory = new(1000);
 
     // fight context
-    private FightContext? fightContext;
-    public  EngineState?  State => fightContext?.Lifecycle;
+    public FightContext? FightContext;
 
     public RuleEngine()
         => eventQueue = new ActionBlock<IEvent>(ProcessEventAsync, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
@@ -34,14 +33,14 @@ public class RuleEngine
 
         if (e is TerritoryChanged tc)
         {
-            fightContext?.CompletedSnap();
-            fightContext?.Uninit();
+            FightContext?.CompletedSnap();
+            FightContext?.Uninit();
 
             var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.ZoneId);
-            fightContext = dutyConfig is not null ? new FightContext(PostEvent, dutyConfig) : null;
-            fightContext?.Init();
+            FightContext = dutyConfig is not null ? new FightContext(dutyConfig) : null;
+            FightContext?.Init();
         }
 
-        fightContext?.ProcessEvent(e);
+        FightContext?.ProcessEvent(e);
     }
 }

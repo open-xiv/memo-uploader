@@ -97,7 +97,7 @@ public class Transition
     public string TargetPhase { get; set; } = string.Empty;
 
     [JsonProperty("conditions")]
-    public List<Trigger> Conditions { get; set; } = [];
+    public List<Condition> Conditions { get; set; } = [];
 }
 
 public class Action
@@ -143,6 +143,12 @@ public class Trigger
 
     [JsonProperty("conditions")]
     public List<Trigger> Conditions { get; set; } = [];
+}
+
+public class Condition
+{
+    [JsonProperty("type")]
+    public string Type { get; set; } = string.Empty;
 
     [JsonProperty("expression")]
     public string Expression { get; set; } = string.Empty;

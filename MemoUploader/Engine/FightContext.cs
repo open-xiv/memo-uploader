@@ -14,14 +14,11 @@ namespace MemoUploader.Engine;
 
 public class FightContext
 {
-    // event props
-    public Action<IEvent> eventRaiser;
-
     // duty config
-    public DutyConfig dutyConfig;
+    private readonly DutyConfig dutyConfig;
 
     // lifecycle
-    public EngineState Lifecycle { get; private set; } = EngineState.Ready;
+    public EngineState Lifecycle { get; private set; }
 
     #region Payload
 
@@ -49,26 +46,40 @@ public class FightContext
     private readonly ConcurrentDictionary<string, object?> variables = [];
 
     // listener
-    private readonly Listener listener = new();
-
-    // trigger
-    private readonly ConcurrentDictionary<Trigger, object> triggerMap = [];
+    private readonly ListenerManager listenerManager = new();
 
     // checkpoints
     private readonly ConcurrentBag<string> completedCheckpoints = [];
 
-    // hp tracking
-    private readonly ConcurrentDictionary<uint, double> hpTracking = [];
+    #endregion
+
+    #region Windows
+
+    private Phase CurrentPhaseConfig => dutyConfig.Timeline.Phases[Math.Max(phaseIndex, 0)];
+
+    // phase
+    public string CurrentPhase => CurrentPhaseConfig.Name;
+
+    public string CurrentSubphase => subphaseIndex >= 0 && subphaseIndex < CurrentPhaseConfig.Checkpoints.Count
+                                         ? CurrentPhaseConfig.Checkpoints[subphaseIndex]
+                                         : string.Empty;
+
+    // checkpoints
+    public List<(string, bool)> Checkpoints => dutyConfig.Timeline.Phases[phaseIndex].Checkpoints
+                                                         .Select(name => (name, completedCheckpoints.Contains(name)))
+                                                         .ToList();
+
+    // variables
+    public IReadOnlyDictionary<string, object?> Variables => variables;
 
     #endregion
 
     #region Lifecycle
 
-    public FightContext(Action<IEvent> eventRaiser, DutyConfig dutyConfig)
+    public FightContext(DutyConfig dutyConfig)
     {
         // props
-        this.eventRaiser = eventRaiser;
-        this.dutyConfig  = dutyConfig;
+        this.dutyConfig = dutyConfig;
 
         // lifecycle
         Lifecycle = EngineState.Ready;
@@ -92,23 +103,6 @@ public class FightContext
         // main enemy hp
         if (DService.ObjectTable.FirstOrDefault(x => x.DataId == enemyId) is IBattleChara enemy)
             enemyHp = (double)enemy.CurrentHp / enemy.MaxHp;
-
-        // hp tracking
-        var revoke = new List<uint>();
-        foreach (var sub in hpTracking)
-        {
-            if (DService.ObjectTable.FirstOrDefault(x => x.DataId == sub.Key) is IBattleChara obj)
-            {
-                var percent = (double)obj.CurrentHp / obj.MaxHp;
-                if (percent < sub.Value)
-                {
-                    eventRaiser(new HpBelowThreshold(obj, sub.Value));
-                    revoke.Add(sub.Key);
-                }
-            }
-        }
-        foreach (var id in revoke)
-            hpTracking.TryRemove(id, out _);
     }
 
     #region EventProcess
@@ -124,23 +118,13 @@ public class FightContext
         if (Lifecycle is not EngineState.InProgress)
             return;
 
-        var relatedTiggers = listener.FetchTrigger(e);
-        foreach (var trigger in relatedTiggers)
+        var relatedListener = listenerManager.FetchListeners(e);
+        foreach (var listener in relatedListener)
         {
-            if (CheckTrigger(trigger, e))
+            if (CheckTrigger(listener.Trigger, e))
             {
-                if (triggerMap.TryGetValue(trigger, out var owner))
-                {
-                    switch (owner)
-                    {
-                        case Mechanic mechanic:
-                            EmitMechanic(mechanic);
-                            break;
-                        case Transition:
-                            CheckTransition();
-                            break;
-                    }
-                }
+                DService.Log.Debug($"Emit trigger matched: {listener.Trigger.Type} for mechanic {listener.Mechanic.Name}");
+                EmitMechanic(listener.Mechanic);
             }
         }
     }
@@ -223,8 +207,8 @@ public class FightContext
         // progress
         var progress = new FightProgressPayload
         {
-            Phase    = (uint)Math.Min(phaseIndex, 0),
-            Subphase = (uint)Math.Min(subphaseIndex, 0),
+            Phase    = (uint)Math.Max(phaseIndex, 0),
+            Subphase = (uint)Math.Max(subphaseIndex, 0),
             EnemyId  = enemyId,
             EnemyHp  = enemyHp
         };
@@ -255,13 +239,16 @@ public class FightContext
         phaseIndex    = phaseId;
         subphaseIndex = -1;
 
-        // clear outdated contexts
-        listener.Clear();
-        triggerMap.Clear();
+        // clear triggers
+        listenerManager.Clear();
+
+        // reset checkpoints
         completedCheckpoints.Clear();
 
-        // transition related mechanics
+        // mechanics
+        // from checkpoints
         var mechanics = new HashSet<string>(phase.Checkpoints);
+        // from transitions
         foreach (var transition in phase.Transitions)
         {
             foreach (var condition in transition.Conditions)
@@ -271,35 +258,19 @@ public class FightContext
             }
         }
 
-        // normal mechanics
+        // register listeners
         foreach (var mechanic in dutyConfig.Mechanics.Where(m => mechanics.Contains(m.Name)))
-        {
-            listener.Register(mechanic.Trigger);
-            triggerMap[mechanic.Trigger] = mechanic;
-        }
-
-        // non-mechanics triggers
-        foreach (var transition in phase.Transitions)
-        {
-            foreach (var condition in transition.Conditions)
-            {
-                if (condition.Type != "MECHANIC_TRIGGERED")
-                {
-                    listener.Register(condition);
-                    triggerMap[condition] = transition;
-                }
-            }
-        }
+            listenerManager.Register(new ListenerState(mechanic, mechanic.Trigger));
 
         // enemy
         enemyId = phase.TargetId;
 
-        DService.Log.Info($"Entered phase: {phase.Name}. Registered {listener.Count} listeners.");
+        DService.Log.Debug($"Enter phase: {phase.Name} (register {listenerManager.Count} listeners)");
     }
 
     private void EmitMechanic(Mechanic mechanic)
     {
-        DService.Log.Info($"Emit mechanic: {mechanic.Name} ({mechanic.NameEn})");
+        DService.Log.Debug($"Emit mechanic: {mechanic.Name} ({mechanic.NameEn})");
         completedCheckpoints.Add(mechanic.Name);
 
         // update progress
@@ -312,13 +283,15 @@ public class FightContext
         foreach (var action in mechanic.Actions)
             EmitAction(action);
 
-        // check for transition
-        CheckTransition();
+        // check transition
+        CheckTransition(mechanic);
     }
 
     private void EmitAction(Action action)
     {
-        DService.Log.Info($"Emit action: {action.Type} for {action.Name} with value {action.Value}");
+        DService.Log.Debug($"Emit action: {action.Type} for {action.Name} with value {action.Value}");
+
+        // update variables
         switch (action.Type)
         {
             case "INCREMENT_VARIABLE":
@@ -329,14 +302,20 @@ public class FightContext
                 variables[action.Name] = action.Value;
                 break;
         }
+
+        // check transition
+        CheckTransition(action.Name);
     }
 
-    private void CheckTransition()
+    private void CheckTransition(Mechanic mechanic)
     {
         var phase = dutyConfig.Timeline.Phases[phaseIndex];
         foreach (var transition in phase.Transitions)
         {
-            if (CheckCondition(transition.Conditions))
+            if (transition.Conditions
+                          .Where(x => x.Type == "MECHANIC_TRIGGERED")
+                          .Any(x => x.MechanicName == mechanic.Name)
+               )
             {
                 EnterPhase(dutyConfig.Timeline.Phases.IndexOf(x => x.Name == transition.TargetPhase));
                 return;
@@ -344,27 +323,107 @@ public class FightContext
         }
     }
 
-    private bool CheckCondition(List<Trigger> conditions)
+    private void CheckTransition(string variable)
     {
-        foreach (var condition in conditions)
+        var phase = dutyConfig.Timeline.Phases[phaseIndex];
+        foreach (var transition in phase.Transitions)
         {
-            if (!CheckTrigger(condition))
-                return false;
+            if (transition.Conditions
+                          .Where(x => x.Type == "EXPRESSION")
+                          .Any(x => x.Expression.Contains(variable) && CheckExpression(x.Expression))
+               )
+            {
+                EnterPhase(dutyConfig.Timeline.Phases.IndexOf(x => x.Name == transition.TargetPhase));
+                return;
+            }
         }
-        return conditions.Count != 0;
     }
 
+    /// <summary>
+    ///     Check if a trigger condition is met.
+    /// </summary>
+    /// <param name="trigger"></param>
+    /// <param name="e"></param>
+    /// <returns></returns>
     private bool CheckTrigger(Trigger trigger, IEvent? e = null)
     {
-        return trigger.Type switch
+        switch (trigger.Type)
         {
-            "HP_THRESHOLD" => enemyHp <= trigger.Value,
-            "MECHANIC_TRIGGERED" => completedCheckpoints.Contains(trigger.MechanicName),
-            "EXPRESSION" =>
-                // TODO: Implement expression evaluation
-                false,
-            _ => false
-        };
+            case "ACTION_EVENT":
+                if (e is IActionEvent actionEvent)
+                    return actionEvent.Match(trigger);
+                return false;
+            case "COMBATANT_EVENT":
+                if (e is ICombatantEvent combatantEvent)
+                    return combatantEvent.Match(trigger);
+                return false;
+            case "STATUS_EVENT":
+                if (e is IStatusEvent statusEvent)
+                    return statusEvent.Match(trigger);
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    private bool CheckExpression(string expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            return false;
+
+        var parts = expression.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3)
+        {
+            DService.Log.Error($"[Expression] Invalid format: '{expression}'. Expected format: 'variables.name operator value'");
+            return false;
+        }
+
+        var variablePath    = parts[0];
+        var op              = parts[1];
+        var literalValueStr = parts[2];
+
+        if (!variablePath.StartsWith("variables."))
+        {
+            DService.Log.Error($"[Expression] Invalid variable path: '{variablePath}'. Must start with 'variables.'");
+            return false;
+        }
+        var variableName = variablePath["variables.".Length..];
+
+        if (!variables.TryGetValue(variableName, out var currentValueObj))
+        {
+            DService.Log.Warning($"[Expression] Variable '{variableName}' not found in state for expression '{expression}'.");
+            return false;
+        }
+
+        try
+        {
+            var currentValue = Convert.ToDouble(currentValueObj);
+            var targetValue  = Convert.ToDouble(literalValueStr);
+
+            switch (op)
+            {
+                case "==":
+                    return Math.Abs(currentValue - targetValue) < 0.05;
+                case "!=":
+                    return Math.Abs(currentValue - targetValue) > 0.05;
+                case ">":
+                    return currentValue > targetValue;
+                case ">=":
+                    return currentValue >= targetValue;
+                case "<":
+                    return currentValue < targetValue;
+                case "<=":
+                    return currentValue <= targetValue;
+                default:
+                    DService.Log.Error($"[Expression] Unsupported operator: '{op}' in expression '{expression}'.");
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            DService.Log.Error(ex, $"[Expression] Failed to evaluate '{expression}'. Check if variable and value are valid numbers.");
+            return false;
+        }
     }
 
     #endregion

@@ -18,10 +18,31 @@ public record TerritoryChanged(ushort ZoneId) : IEvent
     }
 }
 
+#region ActionEvents
+
 // ACTION EVENTS
-public record ActionStart(IGameObject Object, uint ActionId) : IEvent
+public interface IActionEvent : IEvent
 {
-    public override string ToString()
+    IGameObject Object   { get; }
+    uint        ActionId { get; }
+
+    string Status => this switch
+    {
+        ActionStart _ => "START",
+        ActionCompleted _ => "COMPLETE",
+        _ => "UNKNOWN"
+    };
+
+    bool Match(Trigger trigger)
+    {
+        if (trigger.Type != "ACTION_EVENT")
+            return false;
+        var actionMatch = trigger.ActionId.HasValue && trigger.ActionId.Value == ActionId;
+        var statusMatch = trigger.Status == Status;
+        return actionMatch && statusMatch;
+    }
+
+    string IEvent.FormatMessage()
     {
         var actionName = LuminaGetter.TryGetRow<LuminaAction>(ActionId, out var action)
                              ? action.Name.ExtractText()
@@ -31,43 +52,75 @@ public record ActionStart(IGameObject Object, uint ActionId) : IEvent
     }
 }
 
-public record ActionCompleted(IGameObject Object, uint ActionId) : IEvent
-{
-    public override string ToString()
-    {
-        var actionName = LuminaGetter.TryGetRow<LuminaAction>(ActionId, out var action)
-                             ? action.Name.ExtractText()
-                             : "Unknown";
+public record ActionStart(IGameObject Object, uint ActionId) : IActionEvent { }
 
-        return $"{Object.Name.ExtractText()} ({Object.DataId}) - {actionName} ({ActionId})";
-    }
-}
+public record ActionCompleted(IGameObject Object, uint ActionId) : IActionEvent { }
+
+#endregion
+
+#region CombatantEvents
 
 // COMBATANT EVENTS
-public record CombatantSpawn(IGameObject Object) : IEvent
+public interface ICombatantEvent : IEvent
 {
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.DataId})";
+    IGameObject Object { get; }
+
+    string Status => this switch
+    {
+        CombatantSpawn _ => "SPAWN",
+        CombatantDestroy _ => "DESTROY",
+        CombatantTargetable _ => "TARGETABLE",
+        CombatantUntargetable _ => "UNTARGETABLE",
+        _ => "UNKNOWN"
+    };
+
+    bool Match(Trigger trigger)
+    {
+        if (trigger.Type != "COMBATANT_EVENT")
+            return false;
+        var combatantMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == Object.DataId;
+        var statusMatch    = trigger.Condition == Status;
+        return combatantMatch && statusMatch;
+    }
+
+    string IEvent.FormatMessage() => $"{Object.Name.ExtractText()} ({Object.DataId}) - {Status}";
 }
 
-public record CombatantDestroy(IGameObject Object) : IEvent
-{
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.DataId})";
-}
+public record CombatantSpawn(IGameObject Object) : ICombatantEvent { }
 
-public record CombatantTargetable(IGameObject Object) : IEvent
-{
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.DataId})";
-}
+public record CombatantDestroy(IGameObject Object) : ICombatantEvent { }
 
-public record CombatantUntargetable(IGameObject Object) : IEvent
-{
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.DataId})";
-}
+public record CombatantTargetable(IGameObject Object) : ICombatantEvent { }
+
+public record CombatantUntargetable(IGameObject Object) : ICombatantEvent { }
+
+#endregion
+
+#region StatusEvents
 
 // STATUS EVENTS
-public record StatusApplied(uint EntityId, uint StatusId) : IEvent
+public interface IStatusEvent : IEvent
 {
-    public override string ToString()
+    uint EntityId { get; }
+    uint StatusId { get; }
+
+    string Status => this switch
+    {
+        StatusApplied _ => "APPLIED",
+        StatusRemoved _ => "REMOVED",
+        _ => "UNKNOWN"
+    };
+
+    bool Match(Trigger trigger)
+    {
+        if (trigger.Type != "STATUS_EVENT")
+            return false;
+        var statusMatch = trigger.StatusId.HasValue && trigger.StatusId.Value == StatusId;
+        var entityMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == EntityId;
+        return statusMatch && entityMatch;
+    }
+
+    string IEvent.FormatMessage()
     {
         var objName = "Unknown";
         if (DService.ObjectTable.SearchByEntityId(EntityId) is { } obj)
@@ -81,61 +134,68 @@ public record StatusApplied(uint EntityId, uint StatusId) : IEvent
     }
 }
 
-public record StatusRemoved(uint EntityId, uint StatusId) : IEvent
-{
-    public override string ToString()
-    {
-        var objName = "Unknown";
-        if (DService.ObjectTable.SearchByEntityId(EntityId) is { } obj)
-            objName = obj.Name.ToString();
+public record StatusApplied(uint EntityId, uint StatusId) : IStatusEvent { }
 
-        var statusName = "Unknown";
-        if (LuminaGetter.TryGetRow<LuminaStatus>(StatusId, out var status))
-            statusName = status.Name.ExtractText();
+public record StatusRemoved(uint EntityId, uint StatusId) : IStatusEvent { }
 
-        return $"{objName} ({EntityId}) - {statusName} ({StatusId})";
-    }
-}
+#endregion
+
+#region DutyEvents
 
 // DUTY EVENTS
-public record DutyStarted : IEvent
+public interface IDutyEvent : IEvent
 {
-    public override string ToString() => "DutyStarted";
+    string IEvent.FormatMessage()
+    {
+        return this switch
+        {
+            DutyStarted _ => "DutyStarted",
+            DutyRecommenced _ => "DutyRecommenced",
+            DutyCompleted _ => "DutyCompleted",
+            DutyWiped _ => "DutyWiped",
+            _ => "UnknownDutyEvent"
+        };
+    }
 }
 
-public record DutyRecommenced : IEvent
-{
-    public override string ToString() => "DutyRecommenced";
-}
+public record DutyStarted : IDutyEvent { }
 
-public record DutyCompleted : IEvent
-{
-    public override string ToString() => "DutyCompleted";
-}
+public record DutyRecommenced : IDutyEvent { }
 
-public record DutyWiped : IEvent
-{
-    public override string ToString() => "DutyWiped";
-}
+public record DutyCompleted : IDutyEvent { }
+
+public record DutyWiped : IDutyEvent { }
+
+#endregion
+
+#region ConditionEvents
 
 // CONDITION EVENTS
-public record CombatOptIn : IEvent
+public interface IConditionEvent : IEvent
 {
-    public override string ToString() => "CombatOptIn";
+    string IEvent.FormatMessage()
+    {
+        return this switch
+        {
+            CombatOptIn _ => "CombatOptIn",
+            CombatOptOut _ => "CombatOptOut",
+            _ => "UnknownConditionEvent"
+        };
+    }
 }
 
-public record CombatOptOut : IEvent
-{
-    public override string ToString() => "CombatOptOut";
-}
+public record CombatOptIn : IConditionEvent { }
+
+public record CombatOptOut : IConditionEvent { }
+
+#endregion
+
+#region FightEvents
 
 // FIGHT EVENTS
 public record Death(IGameObject Object) : IEvent
 {
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.EntityId})";
+    string IEvent.FormatMessage() => $"{Object.Name.ExtractText()} ({Object.EntityId})";
 }
 
-public record HpBelowThreshold(IGameObject Object, double HpPercent) : IEvent
-{
-    public override string ToString() => $"{Object.Name.ExtractText()} ({Object.EntityId}) - {HpPercent:P2} HP";
-}
+#endregion
