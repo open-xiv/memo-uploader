@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Conditions;
@@ -15,8 +14,9 @@ public static class ApiClient
 {
     private static readonly HttpClient client;
 
-    private const string BaseUrl = "https://api.sumemo.dev";
-    private const string AuthKey = "bc7f766f-8977-46fa-8b2c-5fbe765dfe96";
+    private const string AssetsUrl = "https://assets.sumemo.dev";
+    private const string ApiUrl    = "https://api.sumemo.dev";
+    private const string AuthKey   = "bc7f766f-8977-46fa-8b2c-5fbe765dfe96";
 
     public static bool EnableUpload = true;
 
@@ -39,7 +39,7 @@ public static class ApiClient
     /// <returns>Duty config if successful, otherwise null.</returns>
     public static async Task<DutyConfig?> FetchDutyConfigAsync(uint zoneId)
     {
-        var url = $"{BaseUrl}/duty/{zoneId}?debug={RandomNumberGenerator.GetInt32(int.MaxValue)}";
+        var url = $"{AssetsUrl}/duty/{zoneId}?use-cache=false";
         try
         {
             var resp = await client.GetAsync(url);
@@ -62,30 +62,30 @@ public static class ApiClient
 
     public static async Task<bool> UploadFightRecordAsync(FightRecordPayload payload)
     {
-        const string url = $"{BaseUrl}/fight";
+        const string url = $"{ApiUrl}/fight";
         try
         {
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             if (!EnableUpload || DService.Condition[ConditionFlag.DutyRecorderPlayback])
             {
                 DService.Log.Debug($"{content.ReadAsStringAsync().Result}");
-                DService.Log.Debug("Fight record uploaded canceled");
+                DService.Log.Debug("fight record uploaded canceled");
                 return true;
             }
 
             var resp = await client.PostAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.Created)
             {
-                DService.Log.Debug("Fight record uploaded successfully");
+                DService.Log.Debug("fight record uploaded successfully");
                 return true;
             }
 
-            DService.Log.Error($"Failed to upload fight record: {resp.StatusCode} {resp.ReasonPhrase}");
+            DService.Log.Error($"failed to upload fight record: {resp.StatusCode} {resp.ReasonPhrase}");
             return false;
         }
         catch (Exception e)
         {
-            DService.Log.Error($"Failed to upload fight record: {e.Message}");
+            DService.Log.Error($"failed to upload fight record: {e.Message}");
             return false;
         }
     }

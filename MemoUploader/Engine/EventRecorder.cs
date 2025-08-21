@@ -30,12 +30,16 @@ public class EventRecorder(int maxEventHistory)
 
     public IReadOnlyList<EventLog> GetSnap()
     {
-        lock (snapLock)
-            if (isDirty)
-            {
-                snapHistory = eventHistory.ToList();
-                isDirty     = false;
-            }
+        if (isDirty)
+        {
+            lock (snapLock)
+                // check again to avoid refresh multiple times
+                if (isDirty)
+                {
+                    snapHistory = eventHistory.ToList();
+                    isDirty     = false;
+                }
+        }
         return snapHistory;
     }
 }

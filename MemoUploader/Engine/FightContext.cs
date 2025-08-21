@@ -118,14 +118,16 @@ public class FightContext
         if (Lifecycle is not EngineState.InProgress)
             return;
 
+        // death
+        if (e is Death death && players.TryGetValue(death.Object.EntityId, out var player))
+            player.DeathCount++;
+
+        // listeners
         var relatedListener = listenerManager.FetchListeners(e);
         foreach (var listener in relatedListener)
         {
             if (CheckTrigger(listener.Trigger, e))
-            {
-                DService.Log.Debug($"Emit trigger matched: {listener.Trigger.Type} for mechanic {listener.Mechanic.Name}");
                 EmitMechanic(listener.Mechanic);
-            }
         }
     }
 
@@ -264,13 +266,10 @@ public class FightContext
 
         // enemy
         enemyId = phase.TargetId;
-
-        DService.Log.Debug($"Enter phase: {phase.Name} (register {listenerManager.Count} listeners)");
     }
 
     private void EmitMechanic(Mechanic mechanic)
     {
-        DService.Log.Debug($"Emit mechanic: {mechanic.Name} ({mechanic.NameEn})");
         completedCheckpoints.Add(mechanic.Name);
 
         // update progress
@@ -289,8 +288,6 @@ public class FightContext
 
     private void EmitAction(Action action)
     {
-        DService.Log.Debug($"Emit action: {action.Type} for {action.Name} with value {action.Value}");
-
         // update variables
         switch (action.Type)
         {
@@ -373,27 +370,18 @@ public class FightContext
 
         var parts = expression.Split([' '], StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 3)
-        {
-            DService.Log.Error($"[Expression] Invalid format: '{expression}'. Expected format: 'variables.name operator value'");
             return false;
-        }
 
         var variablePath    = parts[0];
         var op              = parts[1];
         var literalValueStr = parts[2];
 
         if (!variablePath.StartsWith("variables."))
-        {
-            DService.Log.Error($"[Expression] Invalid variable path: '{variablePath}'. Must start with 'variables.'");
             return false;
-        }
         var variableName = variablePath["variables.".Length..];
 
         if (!variables.TryGetValue(variableName, out var currentValueObj))
-        {
-            DService.Log.Warning($"[Expression] Variable '{variableName}' not found in state for expression '{expression}'.");
             return false;
-        }
 
         try
         {
@@ -415,15 +403,10 @@ public class FightContext
                 case "<=":
                     return currentValue <= targetValue;
                 default:
-                    DService.Log.Error($"[Expression] Unsupported operator: '{op}' in expression '{expression}'.");
                     return false;
             }
         }
-        catch (Exception ex)
-        {
-            DService.Log.Error(ex, $"[Expression] Failed to evaluate '{expression}'. Check if variable and value are valid numbers.");
-            return false;
-        }
+        catch (Exception) { return false; }
     }
 
     #endregion

@@ -79,7 +79,7 @@ public interface ICombatantEvent : IEvent
         if (trigger.Type != "COMBATANT_EVENT")
             return false;
         var combatantMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == Object.DataId;
-        var statusMatch    = trigger.Condition == Status;
+        var statusMatch    = trigger.Status == Status;
         return combatantMatch && statusMatch;
     }
 
@@ -115,9 +115,9 @@ public interface IStatusEvent : IEvent
     {
         if (trigger.Type != "STATUS_EVENT")
             return false;
-        var statusMatch = trigger.StatusId.HasValue && trigger.StatusId.Value == StatusId;
-        var entityMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == EntityId;
-        return statusMatch && entityMatch;
+        var staMatch    = trigger.StatusId.HasValue && trigger.StatusId.Value == StatusId;
+        var statusMatch = trigger.Status == Status;
+        return staMatch && statusMatch;
     }
 
     string IEvent.FormatMessage()
