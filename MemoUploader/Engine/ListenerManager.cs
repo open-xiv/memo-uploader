@@ -22,8 +22,6 @@ public class ListenerManager
     /// <param name="state"></param>
     public void Register(ListenerState state)
     {
-        DService.Log.Debug($"Register listener for {state.Trigger.Type} with mechanic {state.Mechanic.Name}");
-
         if (state.Trigger is { Type: "LOGICAL_OPERATOR", Conditions.Count: > 0 })
         {
             foreach (var condition in state.Trigger.Conditions)
