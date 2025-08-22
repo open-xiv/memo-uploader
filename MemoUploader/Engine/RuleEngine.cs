@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using MemoUploader.Api;
 using MemoUploader.Models;
@@ -16,12 +15,11 @@ public class RuleEngine
     private readonly EventRecorder eventHistory = new(1000);
 
     // fight context
-    public FightContext? FightContext;
+    private FightContext? fightContext;
 
     public RuleEngine()
         => eventQueue = new ActionBlock<IEvent>(ProcessEventAsync, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
 
-    public IReadOnlyList<EventLog> EventHistory => eventHistory.GetSnap();
 
     public void PostEvent(IEvent e)
         => eventQueue.Post(e);
@@ -33,14 +31,14 @@ public class RuleEngine
 
         if (e is TerritoryChanged tc)
         {
-            FightContext?.CompletedSnap();
-            FightContext?.Uninit();
+            fightContext?.CompletedSnap();
+            fightContext?.Uninit();
 
             var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.ZoneId);
-            FightContext = dutyConfig is not null ? new FightContext(dutyConfig) : null;
-            FightContext?.Init();
+            fightContext = dutyConfig is not null ? new FightContext(dutyConfig) : null;
+            fightContext?.Init();
         }
 
-        FightContext?.ProcessEvent(e);
+        fightContext?.ProcessEvent(e);
     }
 }

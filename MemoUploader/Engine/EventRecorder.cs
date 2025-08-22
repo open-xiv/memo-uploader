@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using MemoUploader.Models;
 
 
@@ -13,33 +10,12 @@ public class EventRecorder(int maxEventHistory)
     // event log queue
     private readonly ConcurrentQueue<EventLog> eventHistory = [];
 
-    // snapshot
-    private          List<EventLog> snapHistory = [];
-    private          bool           isDirty     = true;
-    private readonly Lock           snapLock    = new();
-
     public void Record(IEvent e)
     {
         eventHistory.Enqueue(new EventLog(DateTime.UtcNow, e.Category, e.Message));
         while (eventHistory.Count > maxEventHistory)
             eventHistory.TryDequeue(out _);
 
-        lock (snapLock)
-            isDirty = true;
-    }
-
-    public IReadOnlyList<EventLog> GetSnap()
-    {
-        if (isDirty)
-        {
-            lock (snapLock)
-                // check again to avoid refresh multiple times
-                if (isDirty)
-                {
-                    snapHistory = eventHistory.ToList();
-                    isDirty     = false;
-                }
-        }
-        return snapHistory;
+        PluginContext.EventHistory = eventHistory.ToArray();
     }
 }
