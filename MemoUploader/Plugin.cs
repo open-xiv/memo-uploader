@@ -3,7 +3,6 @@ using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using MemoUploader.Api;
 using MemoUploader.Engine;
 using MemoUploader.Events;
 using MemoUploader.Windows;
@@ -26,7 +25,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         Config = pi.GetPluginConfig() as Configuration ?? new Configuration();
         DService.Init(pi);
-        ApiClient.EnableUpload = Config.EnableUpload;
 
         // engine
         engine = new RuleEngine();
@@ -39,7 +37,7 @@ public sealed class Plugin : IDalamudPlugin
         eventService.OnEvent += engine.PostEvent;
 
         // window
-        MainWindow = new MainWindow(Config, engine);
+        MainWindow = new MainWindow();
         WindowSystem.AddWindow(MainWindow);
 
         // command

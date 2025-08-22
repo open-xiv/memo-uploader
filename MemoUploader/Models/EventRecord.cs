@@ -1,9 +1,23 @@
-﻿using Lumina.Excel.Sheets;
+﻿using System;
+using Lumina.Excel.Sheets;
 using LuminaStatus = Lumina.Excel.Sheets.Status;
 using LuminaAction = Lumina.Excel.Sheets.Action;
 
 
 namespace MemoUploader.Models;
+
+/// <summary>
+///     Base interface for all events.
+/// </summary>
+public interface IEvent
+{
+    string Category => GetType().Name;
+    string Message  => FormatMessage();
+
+    string FormatMessage() => ToString() ?? string.Empty;
+}
+
+public record EventLog(DateTime Time, string Category, string Message);
 
 // GENERAL EVENTS
 public record TerritoryChanged(ushort ZoneId) : IEvent

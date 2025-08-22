@@ -18,7 +18,7 @@ public class FightContext
     private readonly DutyConfig dutyConfig;
 
     // lifecycle
-    public EngineState Lifecycle { get; private set; }
+    private EngineState lifecycle;
 
     #region Payload
 
@@ -55,26 +55,26 @@ public class FightContext
 
     #region Windows
 
-    private Phase CurrentPhaseConfig => dutyConfig.Timeline.Phases[Math.Max(phaseIndex, 0)];
-
-    // phase
-    public string CurrentPhase => CurrentPhaseConfig.Name;
-
-    public string CurrentSubphase => subphaseIndex >= 0 && subphaseIndex < CurrentPhaseConfig.Checkpoints.Count
-                                         ? CurrentPhaseConfig.Checkpoints[subphaseIndex]
-                                         : string.Empty;
-
-    // checkpoints
-    public List<(string, bool)> Checkpoints => dutyConfig.Timeline.Phases[phaseIndex].Checkpoints
-                                                         .Select(name => (name, completedCheckpoints.Contains(name)))
-                                                         .ToList();
-
-    // variables
-    public IReadOnlyDictionary<string, object?> Variables => variables;
+    private void UpdateContext()
+    {
+        var phase = dutyConfig.Timeline.Phases[Math.Max(phaseIndex, 0)];
+        PluginContext.CurrentPhase = phase.Name;
+        PluginContext.CurrentSubphase = subphaseIndex >= 0 && subphaseIndex < phase.Checkpoints.Count
+                                            ? phase.Checkpoints[subphaseIndex]
+                                            : string.Empty;
+        PluginContext.Checkpoints = phase.Checkpoints.Select(name => (name, completedCheckpoints.Contains(name))).ToArray();
+        PluginContext.Variables   = variables;
+    }
 
     #endregion
 
     #region Lifecycle
+
+    private void SetState(EngineState state)
+    {
+        lifecycle               = state;
+        PluginContext.Lifecycle = state;
+    }
 
     public FightContext(DutyConfig dutyConfig)
     {
@@ -82,7 +82,7 @@ public class FightContext
         this.dutyConfig = dutyConfig;
 
         // lifecycle
-        Lifecycle = EngineState.Ready;
+        SetState(EngineState.Ready);
 
         // variables
         foreach (var vars in dutyConfig.Variables)
@@ -91,7 +91,11 @@ public class FightContext
 
     public void Init() => DService.Framework.Update += OnFrameworkUpdate;
 
-    public void Uninit() => DService.Framework.Update -= OnFrameworkUpdate;
+    public void Uninit()
+    {
+        DService.Framework.Update -= OnFrameworkUpdate;
+        PluginContext.Lifecycle   =  null;
+    }
 
     #endregion
 
@@ -109,13 +113,13 @@ public class FightContext
 
     public void ProcessEvent(IEvent e)
     {
-        if (Lifecycle is EngineState.Completed)
+        if (lifecycle is EngineState.Completed)
             return;
 
         // lifecycle related events
         LifecycleEvent(e);
 
-        if (Lifecycle is not EngineState.InProgress)
+        if (lifecycle is not EngineState.InProgress)
             return;
 
         // death
@@ -135,8 +139,8 @@ public class FightContext
     {
         switch (e)
         {
-            case CombatOptIn when Lifecycle is EngineState.Ready:
-                Lifecycle = EngineState.InProgress;
+            case CombatOptIn when lifecycle is EngineState.Ready:
+                SetState(EngineState.InProgress);
                 StartSnap();
                 break;
 
@@ -145,25 +149,25 @@ public class FightContext
                 break;
 
             case DutyWiped:
-                Lifecycle = EngineState.Completed;
-                isClear   = false;
+                SetState(EngineState.Completed);
+                isClear = false;
                 CompletedSnap();
                 return;
 
             case DutyCompleted:
-                Lifecycle = EngineState.Completed;
-                isClear   = true;
+                SetState(EngineState.Completed);
+                isClear = true;
                 CompletedSnap();
                 return;
 
             // dev: regard first cast as combat opt-in when playback
-            case ActionCompleted when Lifecycle is EngineState.Ready && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
-                Lifecycle = EngineState.InProgress;
+            case ActionCompleted when lifecycle is EngineState.Ready && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
+                SetState(EngineState.InProgress);
                 StartSnap();
                 break;
 
             // dev: regard last cast as combat opt-out when playback
-            case ActionCompleted when Lifecycle is EngineState.InProgress && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
+            case ActionCompleted when lifecycle is EngineState.InProgress && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
                 lastCombatOptOutTime = DateTime.UtcNow;
                 break;
         }
@@ -266,6 +270,9 @@ public class FightContext
 
         // enemy
         enemyId = phase.TargetId;
+
+        // update context (phase change)
+        UpdateContext();
     }
 
     private void EmitMechanic(Mechanic mechanic)
@@ -284,6 +291,9 @@ public class FightContext
 
         // check transition
         CheckTransition(mechanic);
+
+        // update context (subphase and checkpoints change)
+        UpdateContext();
     }
 
     private void EmitAction(Action action)
@@ -302,6 +312,9 @@ public class FightContext
 
         // check transition
         CheckTransition(action.Name);
+
+        // update context (variables change)
+        UpdateContext();
     }
 
     private void CheckTransition(Mechanic mechanic)

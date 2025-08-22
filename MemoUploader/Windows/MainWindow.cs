@@ -2,8 +2,6 @@
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Windowing;
-using MemoUploader.Api;
-using MemoUploader.Engine;
 using MemoUploader.Models;
 
 
@@ -11,22 +9,14 @@ namespace MemoUploader.Windows;
 
 public class MainWindow : Window, IDisposable
 {
-    // props
-    private readonly Configuration config;
-    private readonly RuleEngine    engine;
-
     // window
     private Tab currentTab = Tab.Status;
 
     // event recorder
     private string eventFilter = string.Empty;
 
-    public MainWindow(Configuration config, RuleEngine engine) : base("SuMemo Uploader##sumemo-uploader-main", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+    public MainWindow() : base("SuMemo Uploader##sumemo-uploader-main", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
-        // props
-        this.config = config;
-        this.engine = engine;
-
         // window
         SizeConstraints = new WindowSizeConstraints
         {
@@ -81,9 +71,6 @@ public class MainWindow : Window, IDisposable
 
         if (ImGuiOm.SelectableTextCentered("事件", currentTab == Tab.EventQueue))
             currentTab = Tab.EventQueue;
-
-        if (ImGuiOm.SelectableTextCentered("挂钩", currentTab == Tab.Listeners))
-            currentTab = Tab.Listeners;
     }
 
     private void DrawContent()
@@ -99,67 +86,110 @@ public class MainWindow : Window, IDisposable
             case Tab.EventQueue:
                 DrawEventQueueTab();
                 break;
-            case Tab.Listeners:
-                DrawListenersTab();
-                break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
     }
 
-    private void DrawSettingsTab()
-    {
-        ImGui.Text("设置");
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        var enableUpload = config.EnableUpload;
-        if (ImGuiOm.CheckboxColored("进度上传", ref enableUpload))
-        {
-            config.EnableUpload    = enableUpload;
-            ApiClient.EnableUpload = enableUpload;
-            config.Save();
-        }
-    }
+    private void DrawSettingsTab() { }
 
     private void DrawStatusTab()
     {
         // engine status
-        ImGui.TextColored(LightSkyBlue, "解析引擎");
-        ImGui.SameLine();
-        var color = engine.FightContext?.Lifecycle switch
+        if (ImGui.BeginTable("StatusTable", 2, ImGuiTableFlags.None))
         {
-            EngineState.Ready => Gold,
-            EngineState.InProgress => LimeGreen,
-            EngineState.Completed => DeepSkyBlue,
-            _ => Tomato
-        };
-        var slug = engine.FightContext?.Lifecycle switch
-        {
-            EngineState.Ready => "准备就绪",
-            EngineState.InProgress => "解析中",
-            EngineState.Completed => "完成解析",
-            _ => "关闭"
-        };
-        ImGui.TextColored(color, $"{slug}");
+            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 100f);
+            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
+
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            ImGui.TextColored(LightSkyBlue, "解析引擎");
+
+            ImGui.TableSetColumnIndex(1);
+            var state = PluginContext.Lifecycle;
+            var (color, slug) = state switch
+            {
+                EngineState.Ready => (Gold, "准备就绪"),
+                EngineState.InProgress => (LimeGreen, "解析中"),
+                EngineState.Completed => (DeepSkyBlue, "完成解析"),
+                _ => (Tomato, "关闭")
+            };
+            ImGui.TextColored(color, slug);
+
+            ImGui.EndTable();
+        }
+
+        if (PluginContext.Lifecycle is not EngineState.InProgress)
+            return;
+
+        ImGui.Separator();
 
         // fight progress
-        if (engine.FightContext?.Lifecycle is EngineState.InProgress)
+        if (ImGui.BeginTable("ProgressTable", 2, ImGuiTableFlags.None))
         {
-            ImGui.TextColored(LightSkyBlue, "战斗进度");
-            ImGui.SameLine();
-            ImGui.TextColored(Gold, $"{engine.FightContext.CurrentPhase}");
-            ImGui.SameLine();
-            ImGui.TextColored(LightSkyBlue, $"({engine.FightContext.CurrentSubphase})");
+            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 100f);
+            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
 
-            foreach (var checkpoint in engine.FightContext.Checkpoints)
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            ImGui.TextColored(LightSkyBlue, "战斗进度");
+
+            ImGui.TableSetColumnIndex(1);
+            ImGui.TextColored(Gold, PluginContext.CurrentPhase);
+            if (!string.IsNullOrEmpty(PluginContext.CurrentSubphase))
             {
-                ImGui.TextColored(LightGreen, $"{checkpoint.Item1}");
                 ImGui.SameLine();
-                ImGui.TextColored(LightSkyBlue, checkpoint.Item2 ? "已完成" : "未完成");
+                ImGui.TextColored(LightSkyBlue, $"{PluginContext.CurrentSubphase}");
             }
+            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+
+        // checkpoints
+        if (ImGui.BeginTable("CheckpointsTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        {
+            // 表头
+            ImGui.TableSetupColumn("检查点", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("状态", ImGuiTableColumnFlags.WidthFixed, 80f);
+            ImGui.TableHeadersRow();
+
+            // 表格内容
+            foreach (var (name, completed) in PluginContext.Checkpoints)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.Text(name);
+
+                ImGui.TableSetColumnIndex(1);
+                var statusText  = completed ? "已完成" : "未完成";
+                var statusColor = completed ? LightGreen : LightSkyBlue;
+                ImGui.TextColored(statusColor, statusText);
+            }
+            ImGui.EndTable();
+        }
+
+        if (PluginContext.Variables.Count <= 0)
+            return;
+
+        ImGui.Spacing();
+
+        if (ImGui.BeginTable("VariablesTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("变量", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("当前值", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableHeadersRow();
+
+            foreach (var (key, value) in PluginContext.Variables)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.Text(key);
+
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextColored(Gold, value?.ToString() ?? "null");
+            }
+            ImGui.EndTable();
         }
     }
 
@@ -180,7 +210,7 @@ public class MainWindow : Window, IDisposable
                 ImGui.TableSetupColumn("Message", ImGuiTableColumnFlags.WidthStretch);
 
                 // filter events
-                var events = engine.EventHistory;
+                var events = PluginContext.EventHistory;
                 var showEvents = string.IsNullOrWhiteSpace(eventFilter)
                                      ? events
                                      : events.Where(log =>
@@ -210,26 +240,10 @@ public class MainWindow : Window, IDisposable
         ImGui.EndChild();
     }
 
-    private void DrawListenersTab()
-    {
-        if (engine.FightContext?.Lifecycle is not EngineState.InProgress)
-            return;
-
-        ImGui.TextColored(LightSkyBlue, "变量列表");
-
-        foreach (var variable in engine.FightContext.Variables)
-        {
-            ImGui.TextColored(LightSkyBlue, $"{variable.Key}");
-            ImGui.SameLine();
-            ImGui.TextColored(Gold, $"{variable.Value}");
-        }
-    }
-
     private enum Tab
     {
         Status,
         Settings,
-        EventQueue,
-        Listeners
+        EventQueue
     }
 }
