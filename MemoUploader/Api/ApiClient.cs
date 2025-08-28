@@ -70,6 +70,8 @@ public static class ApiClient
                 DService.Log.Debug("fight record uploaded successfully");
                 return true;
             }
+            DService.Log.Warning($"fight record upload failed: {resp.StatusCode}");
+            DService.Log.Warning(resp.Content.ReadAsStringAsync().Result);
             return false;
         }
         catch (Exception) { return false; }
