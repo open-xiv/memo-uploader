@@ -184,17 +184,34 @@ public class FightContext
 
         // players
         players.Clear();
-        players = DService.PartyList.ToConcurrentDictionary(
-            p => p.ObjectId,
-            p => new PlayerPayload
-            {
-                Name       = p.Name.ExtractText(),
-                Server     = p.World.Value.Name.ExtractText(),
-                JobId      = p.ClassJob.RowId,
-                Level      = p.Level,
-                DeathCount = 0
-            }
-        );
+        if (DService.PartyList.Length >= 1)
+        {
+            players = DService.PartyList.ToConcurrentDictionary(
+                p => p.ObjectId,
+                p => new PlayerPayload
+                {
+                    Name       = p.Name.ExtractText(),
+                    Server     = p.World.Value.Name.ExtractText(),
+                    JobId      = p.ClassJob.RowId,
+                    Level      = p.Level,
+                    DeathCount = 0
+                }
+            );
+        }
+        else if (DService.ObjectTable.LocalPlayer is { } localPlayer)
+        {
+            players.TryAdd(localPlayer.EntityId,
+                           new PlayerPayload
+                           {
+                               Name       = localPlayer.Name.ExtractText(),
+                               Server     = localPlayer.HomeWorld.Value.Name.ExtractText(),
+                               JobId      = localPlayer.ClassJob.RowId,
+                               Level      = localPlayer.Level,
+                               DeathCount = 0
+                           });
+        }
+        else
+            return;
 
         // progress
         phaseIndex    = 0;
