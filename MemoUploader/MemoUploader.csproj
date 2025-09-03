@@ -16,6 +16,7 @@
 
     <ItemGroup>
         <Content Include=".editorconfig"/>
+        <Content Include="Api\.gitignore"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -24,5 +25,9 @@
 
     <ItemGroup>
         <Folder Include="Utils\"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Api\ApiSecrets.cs.example"/>
     </ItemGroup>
 </Project>

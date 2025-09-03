@@ -1,6 +1,9 @@
+# IDE
 .vs/
+.idea/
+.vscode/
+
+# build
 obj/
 bin/
 *.user
-
-.idea/

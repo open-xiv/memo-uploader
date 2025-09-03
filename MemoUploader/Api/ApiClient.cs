@@ -16,7 +16,7 @@ public static class ApiClient
 
     private const string AssetsUrl = "https://assets.sumemo.dev";
     private const string ApiUrl    = "https://api.sumemo.dev";
-    private const string AuthKey   = "1a81c443-ceec-4df3-a676-e90203da007f";
+    private const string AuthKey   = ApiSecrets.AuthKey;
 
     static ApiClient()
     {
