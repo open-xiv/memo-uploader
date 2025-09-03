@@ -11,15 +11,15 @@ public class ListenerManager
     private readonly Dictionary<string, Dictionary<uint, List<ListenerState>>> listeners = [];
 
     /// <summary>
-    ///     Clears all registered listeners.
+    ///     clears all registered listeners.
     /// </summary>
     public void Clear()
         => listeners.Clear();
 
     /// <summary>
-    ///     Registers a trigger for a specific event type.
+    ///     registers a listener.
     /// </summary>
-    /// <param name="state"></param>
+    /// <param name="state">listener to register</param>
     public void Register(ListenerState state)
     {
         if (state.Trigger is { Type: "LOGICAL_OPERATOR", Conditions.Count: > 0 })
@@ -50,6 +50,11 @@ public class ListenerManager
         typeListeners[id].Add(new ListenerState(state.Mechanic, state.Trigger));
     }
 
+    /// <summary>
+    ///     fetches all listeners related to the given event.
+    /// </summary>
+    /// <param name="e">event to fetch listeners for</param>
+    /// <returns>enumerable of listener</returns>
     public IEnumerable<ListenerState> FetchListeners(IEvent e)
     {
         var type = e switch
@@ -71,9 +76,4 @@ public class ListenerManager
             return list;
         return [];
     }
-
-    /// <summary>
-    ///     Gets the total count of all registered listeners.
-    /// </summary>
-    public int Count => listeners.Count;
 }

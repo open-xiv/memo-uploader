@@ -6,9 +6,6 @@ using LuminaAction = Lumina.Excel.Sheets.Action;
 
 namespace MemoUploader.Models;
 
-/// <summary>
-///     Base interface for all events.
-/// </summary>
 public interface IEvent
 {
     string Category => GetType().Name;

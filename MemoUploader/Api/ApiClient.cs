@@ -31,10 +31,10 @@ public static class ApiClient
     }
 
     /// <summary>
-    ///     Fetch duty configuration from the API.
+    ///     fetch duty configuration from the API.
     /// </summary>
-    /// <param name="zoneId">The zone ID of the duty.</param>
-    /// <returns>Duty config if successful, otherwise null.</returns>
+    /// <param name="zoneId">zone id of territory</param>
+    /// <returns>duty config if successful, otherwise null</returns>
     public static async Task<DutyConfig?> FetchDutyConfigAsync(uint zoneId)
     {
         var url = $"{AssetsUrl}/duty/{zoneId}?use-cache=false";
@@ -51,6 +51,11 @@ public static class ApiClient
         catch (Exception) { return null; }
     }
 
+    /// <summary>
+    ///     upload fight record to the API.
+    /// </summary>
+    /// <param name="payload">fight record payload</param>
+    /// <returns>true if successful, otherwise false</returns>
     public static async Task<bool> UploadFightRecordAsync(FightRecordPayload payload)
     {
         const string url = $"{ApiUrl}/fight";
@@ -60,7 +65,7 @@ public static class ApiClient
             if (DService.Condition[ConditionFlag.DutyRecorderPlayback])
             {
                 DService.Log.Debug($"{content.ReadAsStringAsync().Result}");
-                DService.Log.Debug("fight record uploaded canceled [playback]");
+                DService.Log.Debug("fight record uploaded canceled [playback mode]");
                 return true;
             }
 

@@ -21,9 +21,17 @@ public class RuleEngine
         => eventQueue = new ActionBlock<IEvent>(ProcessEventAsync, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
 
 
+    /// <summary>
+    ///     proxy to post an event to the event queue.
+    /// </summary>
+    /// <param name="e">event emitted</param>
     public void PostEvent(IEvent e)
         => eventQueue.Post(e);
 
+    /// <summary>
+    ///     process an event from the event queue, and route it to the fight context if needed.
+    /// </summary>
+    /// <param name="e">event emitted</param>
     public async Task ProcessEventAsync(IEvent e)
     {
         // event logs

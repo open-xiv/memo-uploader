@@ -111,6 +111,10 @@ public class FightContext
 
     #region EventProcess
 
+    /// <summary>
+    ///     process an event, and determine if it emits engine lifecycle change or mechanic trigger.
+    /// </summary>
+    /// <param name="e">event emitted</param>
     public void ProcessEvent(IEvent e)
     {
         if (lifecycle is EngineState.Completed)
@@ -135,6 +139,10 @@ public class FightContext
         }
     }
 
+    /// <summary>
+    ///     process lifecycle related events.
+    /// </summary>
+    /// <param name="e">event emitted</param>
     public void LifecycleEvent(IEvent e)
     {
         switch (e)
@@ -177,6 +185,9 @@ public class FightContext
 
     #region Snapshot
 
+    /// <summary>
+    ///     when combat opt-in, start a new fight record snapshot. (timestamp, players, phase)
+    /// </summary>
     private void StartSnap()
     {
         // time
@@ -221,6 +232,9 @@ public class FightContext
         EnterPhase(0);
     }
 
+    /// <summary>
+    ///     when duty is completed or wiped, finalize the fight record snapshot and upload it to the API.
+    /// </summary>
     public void CompletedSnap()
     {
         // time
@@ -255,6 +269,10 @@ public class FightContext
 
     #region StateMachine
 
+    /// <summary>
+    ///     enter a new phase, register listeners, reset checkpoints.
+    /// </summary>
+    /// <param name="phaseId">phase index to enter</param>
     private void EnterPhase(int phaseId)
     {
         // phase transition
@@ -292,6 +310,10 @@ public class FightContext
         UpdateContext();
     }
 
+    /// <summary>
+    ///     emit a mechanic, update progress, and check for phase transition.
+    /// </summary>
+    /// <param name="mechanic">mechanic emitted</param>
     private void EmitMechanic(Mechanic mechanic)
     {
         completedCheckpoints.Add(mechanic.Name);
@@ -313,6 +335,10 @@ public class FightContext
         UpdateContext();
     }
 
+    /// <summary>
+    ///     emit an action, update variables, and check for phase transition.
+    /// </summary>
+    /// <param name="action">action emitted</param>
     private void EmitAction(Action action)
     {
         // update variables
@@ -334,6 +360,10 @@ public class FightContext
         UpdateContext();
     }
 
+    /// <summary>
+    ///     check if a mechanic triggered a phase transition.
+    /// </summary>
+    /// <param name="mechanic">mechanic emitted</param>
     private void CheckTransition(Mechanic mechanic)
     {
         var phase = dutyConfig.Timeline.Phases[phaseIndex];
@@ -350,6 +380,10 @@ public class FightContext
         }
     }
 
+    /// <summary>
+    ///     check if a variable change triggered a phase transition.
+    /// </summary>
+    /// <param name="variable">variable name changed</param>
     private void CheckTransition(string variable)
     {
         var phase = dutyConfig.Timeline.Phases[phaseIndex];
@@ -367,11 +401,11 @@ public class FightContext
     }
 
     /// <summary>
-    ///     Check if a trigger condition is met.
+    ///     check if an event matches a trigger.
     /// </summary>
-    /// <param name="trigger"></param>
-    /// <param name="e"></param>
-    /// <returns></returns>
+    /// <param name="trigger">trigger to check</param>
+    /// <param name="e">event to match</param>
+    /// <returns>true if matches, otherwise false</returns>
     private bool CheckTrigger(Trigger trigger, IEvent? e = null)
     {
         switch (trigger.Type)
@@ -393,6 +427,11 @@ public class FightContext
         }
     }
 
+    /// <summary>
+    ///     check if an expression is true.
+    /// </summary>
+    /// <param name="expression">expression to check</param>
+    /// <returns>true if true, otherwise false</returns>
     private bool CheckExpression(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression))
