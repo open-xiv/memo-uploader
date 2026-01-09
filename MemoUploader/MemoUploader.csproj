@@ -1,7 +1,11 @@
-﻿<Project Sdk="Dalamud.CN.NET.Sdk/12.0.2">
+﻿<Project Sdk="Dalamud.CN.NET.Sdk/14.0.1">
     <PropertyGroup>
-        <Version>0.0.0.1</Version>
-        <Description>SuMemo Uploader</Description>
+        <Version>7.4.2</Version>
+        <Author>HaKu</Author>
+        <Name>SuMemo Uploader</Name>
+        <InternalName>SuMemoUploader</InternalName>
+        <Punchline>帮助你实时显示、记录部分高难副本的进度。</Punchline>
+        <Description>将你的高难战斗记录自动同步到酥卷（进度记录平台）。</Description>
         <PackageProjectUrl>https://github.com/open-xiv/MemoUploader</PackageProjectUrl>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
         <IsPackable>false</IsPackable>
@@ -21,13 +25,5 @@
 
     <ItemGroup>
         <ProjectReference Include="..\OmenTools\OmenTools.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Utils\"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Compile Include="Api\ApiSecrets.cs.example"/>
     </ItemGroup>
 </Project>

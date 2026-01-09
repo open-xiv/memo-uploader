@@ -12,14 +12,14 @@ namespace MemoUploader;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private const string CommandName = "/smm";
+    private const string CommandName = "/memo";
 
     // service
     private readonly RuleEngine   engine;
     private readonly EventManager eventService;
 
     // plugin windows
-    public readonly WindowSystem WindowSystem = new("MemoUploader");
+    public readonly WindowSystem WindowSystem = new("酥卷");
 
     public Plugin(IDalamudPluginInterface pi)
     {
@@ -41,7 +41,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(MainWindow);
 
         // command
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand) { HelpMessage = "Open SuMemo Uploader Window" });
+        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand) { HelpMessage = "打开当前进度窗口" });
 
         pi.UiBuilder.Draw       += DrawUI;
         pi.UiBuilder.OpenMainUi += ToggleMainUI;

@@ -1,71 +1,54 @@
 ﻿using System;
-using Dalamud.Hooking;
+using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using MemoUploader.Models;
+using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
 
 namespace MemoUploader.Events;
 
-public unsafe class ActionManager(Action<IEvent> eventRaiser)
+public class ActionManager(Action<IEvent> eventRaiser)
 {
-    private static readonly CompSig                    actionStartSig = new("E8 ?? ?? ?? ?? E9 ?? ?? ?? ?? 48 89 BC 24 D0 00 00 00");
-    private static          Hook<ActionStartDelegate>? actionStartHook;
-
-    private static readonly CompSig                       actionCompletedSig = new("E8 ?? ?? ?? ?? 48 8B CF E8 ?? ?? ?? ?? 45 33 C0 48 8D 0D");
-    private static          Hook<ActionCompleteDelegate>? actionCompletedHook;
-
     public void Init()
     {
-        actionStartHook ??= actionStartSig.GetHook<ActionStartDelegate>(OnActionStartDetour);
-        actionStartHook.Enable();
-
-        actionCompletedHook ??= actionCompletedSig.GetHook<ActionCompleteDelegate>(OnActionCompleteDetour);
-        actionCompletedHook.Enable();
+        UseActionManager.RegCharacterStartCast(OnActionStart);
+        UseActionManager.RegCharacterCompleteCast(OnActionComplete);
     }
 
     public void Uninit()
     {
-        actionStartHook?.Dispose();
-        actionStartHook = null;
-
-        actionCompletedHook?.Dispose();
-        actionCompletedHook = null;
+        UseActionManager.Unreg(OnActionStart);
+        UseActionManager.Unreg(OnActionComplete);
     }
 
-    private nint OnActionStartDetour(BattleChara* player, ActionType type, uint actionId, nint a4, float rotation, float a6)
+    private void OnActionStart(nint a1, IBattleChara player, ActionType type, uint actionID, nint a4, float rotation, float a6)
     {
-        if (player->ObjectKind is ObjectKind.BattleNpc)
-        {
-            if (DService.ObjectTable.SearchByEntityId(player->EntityId) is { } obj)
-                eventRaiser(new ActionStart(obj, actionId));
-        }
+        if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
+            return;
 
-        if (actionStartHook is null)
-            return nint.Zero;
-
-        var original = actionStartHook.Original(player, type, actionId, a4, rotation, a6);
-        return original;
+        if (DService.ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
+            eventRaiser(new ActionStart(obj, actionID));
     }
 
-    private nint OnActionCompleteDetour(BattleChara* player, ActionType type, uint actionId, uint spellId, GameObjectId a5, nint a6, float rotation, short a8, int a9, int a10)
+    private void OnActionComplete(
+        nint         a1,
+        IBattleChara player,
+        ActionType   type,
+        uint         actionID,
+        uint         spellID,
+        GameObjectId a5,
+        Vector3      a6,
+        float        rotation,
+        short        a8,
+        int          a9,
+        int          a10
+    )
     {
-        if (player->ObjectKind is ObjectKind.BattleNpc)
-        {
-            if (DService.ObjectTable.SearchByEntityId(player->EntityId) is { } obj)
-                eventRaiser(new ActionCompleted(obj, actionId));
-        }
+        if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
+            return;
 
-        if (actionCompletedHook is null)
-            return nint.Zero;
-
-        var original = actionCompletedHook.Original(player, type, actionId, spellId, a5, a6, rotation, a8, a9, a10);
-        return original;
+        if (DService.ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
+            eventRaiser(new ActionCompleted(obj, actionID));
     }
-
-    private delegate nint ActionStartDelegate(BattleChara* player, ActionType type, uint actionId, nint a4, float rotation, float a6);
-
-    private delegate nint ActionCompleteDelegate(
-        BattleChara* player, ActionType type, uint actionId, uint spellId, GameObjectId a5, nint a6, float rotation, short a8, int a9, int a10);
 }

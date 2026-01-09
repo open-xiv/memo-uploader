@@ -1,8 +1,8 @@
 {
   "Author": "Haku",
   "Name": "SuMemo Uploader",
-  "Punchline": "将战斗记录同步到 SuMemo",
-  "Description": "SuMemo 支持的记录上传工具",
+  "Punchline": "帮助你实时显示、记录部分副本的进度。",
+  "Description": "由酥卷提供技术支持",
   "ApplicableVersion": "any",
   "Tags": [
     "sumemo",
