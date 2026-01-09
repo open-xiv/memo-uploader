@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Plugin.Services;
 using MemoUploader.Api;
 using MemoUploader.Models;
@@ -17,9 +16,6 @@ public class FightContext
     // duty config
     private readonly DutyConfig dutyConfig;
 
-    // lifecycle
-    private EngineState lifecycle;
-
     #region Payload
 
     // time
@@ -32,8 +28,8 @@ public class FightContext
     private int  subphaseIndex; // checkpoint index
 
     // enemy
-    private uint   enemyId;
-    private double enemyHp;
+    private uint   enemyID;
+    private double enemyHP;
 
     #endregion
 
@@ -59,34 +55,24 @@ public class FightContext
     {
         var phase = dutyConfig.Timeline.Phases[Math.Max(phaseIndex, 0)];
         PluginContext.CurrentPhase = phase.Name;
-        PluginContext.CurrentSubphase = subphaseIndex >= 0 && subphaseIndex < phase.Checkpoints.Count
-                                            ? phase.Checkpoints[subphaseIndex]
+        PluginContext.CurrentSubphase = subphaseIndex >= 0 && subphaseIndex < phase.CheckpointNames.Count
+                                            ? phase.CheckpointNames[subphaseIndex]
                                             : string.Empty;
-        PluginContext.Checkpoints = phase.Checkpoints.Select(name => (name, completedCheckpoints.Contains(name))).ToArray();
-        PluginContext.Variables   = variables;
+        PluginContext.Checkpoints   = phase.CheckpointNames.Select(name => (name, completedCheckpoints.Contains(name))).ToArray();
+        PluginContext.VariableStats = variables;
     }
 
     #endregion
 
     #region Lifecycle
 
-    private void SetState(EngineState state)
-    {
-        lifecycle               = state;
-        PluginContext.Lifecycle = state;
-    }
-
     public FightContext(DutyConfig dutyConfig)
     {
         // props
         this.dutyConfig = dutyConfig;
 
-        // lifecycle
-        SetState(EngineState.Ready);
-
-        // variables
-        foreach (var vars in dutyConfig.Variables)
-            variables[vars.Name] = vars.Initial;
+        // reset state
+        ResetState();
     }
 
     public void Init() => DService.Framework.Update += OnFrameworkUpdate;
@@ -105,29 +91,22 @@ public class FightContext
             return;
 
         // main enemy hp
-        if (DService.ObjectTable.FirstOrDefault(x => x.DataId == enemyId) is IBattleChara enemy)
-            enemyHp = (double)enemy.CurrentHp / enemy.MaxHp;
+        if (DService.ObjectTable.FirstOrDefault(x => x.DataID == enemyID) is IBattleChara enemy)
+            enemyHP = (double)enemy.CurrentHp / enemy.MaxHp;
     }
 
     #region EventProcess
 
-    /// <summary>
-    ///     process an event, and determine if it emits engine lifecycle change or mechanic trigger.
-    /// </summary>
-    /// <param name="e">event emitted</param>
     public void ProcessEvent(IEvent e)
     {
-        if (lifecycle is EngineState.Completed)
-            return;
-
         // lifecycle related events
         LifecycleEvent(e);
 
-        if (lifecycle is not EngineState.InProgress)
+        if (PluginContext.Lifecycle is not EngineState.InProgress)
             return;
 
         // death
-        if (e is Death death && players.TryGetValue(death.Object.EntityId, out var player))
+        if (e is Death death && players.TryGetValue(death.Object.EntityID, out var player))
             player.DeathCount++;
 
         // listeners
@@ -139,17 +118,17 @@ public class FightContext
         }
     }
 
-    /// <summary>
-    ///     process lifecycle related events.
-    /// </summary>
-    /// <param name="e">event emitted</param>
     public void LifecycleEvent(IEvent e)
     {
         switch (e)
         {
-            case CombatOptIn when lifecycle is EngineState.Ready:
-                SetState(EngineState.InProgress);
-                StartSnap();
+            case CombatOptIn:
+                if (PluginContext.Lifecycle is EngineState.Completed or EngineState.Ready)
+                {
+                    ResetState();
+                    PluginContext.Lifecycle = EngineState.InProgress;
+                    StartSnap();
+                }
                 break;
 
             case CombatOptOut:
@@ -157,27 +136,16 @@ public class FightContext
                 break;
 
             case DutyWiped:
-                SetState(EngineState.Completed);
-                isClear = false;
+                PluginContext.Lifecycle = EngineState.Completed;
+                isClear                 = false;
                 CompletedSnap();
                 return;
 
             case DutyCompleted:
-                SetState(EngineState.Completed);
-                isClear = true;
+                PluginContext.Lifecycle = EngineState.Completed;
+                isClear                 = true;
                 CompletedSnap();
                 return;
-
-            // dev: regard first cast as combat opt-in when playback
-            case ActionCompleted when lifecycle is EngineState.Ready && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
-                SetState(EngineState.InProgress);
-                StartSnap();
-                break;
-
-            // dev: regard last cast as combat opt-out when playback
-            case ActionCompleted when lifecycle is EngineState.InProgress && DService.Condition[ConditionFlag.DutyRecorderPlayback]:
-                lastCombatOptOutTime = DateTime.UtcNow;
-                break;
         }
     }
 
@@ -185,25 +153,23 @@ public class FightContext
 
     #region Snapshot
 
-    /// <summary>
-    ///     when combat opt-in, start a new fight record snapshot. (timestamp, players, phase)
-    /// </summary>
     private void StartSnap()
     {
         // time
-        startTime = DateTime.UtcNow;
+        startTime            = DateTime.UtcNow;
+        lastCombatOptOutTime = null;
 
         // players
         players.Clear();
         if (DService.PartyList.Length >= 1)
         {
             players = DService.PartyList.ToConcurrentDictionary(
-                p => p.ObjectId,
+                p => p.EntityId,
                 p => new PlayerPayload
                 {
-                    Name       = p.Name.ExtractText(),
-                    Server     = p.World.Value.Name.ExtractText(),
-                    JobId      = p.ClassJob.RowId,
+                    Name       = p.Name.ToString(),
+                    Server     = p.World.Value.Name.ToString(),
+                    JobID      = p.ClassJob.RowId,
                     Level      = p.Level,
                     DeathCount = 0
                 }
@@ -211,43 +177,32 @@ public class FightContext
         }
         else if (DService.ObjectTable.LocalPlayer is { } localPlayer)
         {
-            players.TryAdd(localPlayer.EntityId,
+            players.TryAdd(localPlayer.EntityID,
                            new PlayerPayload
                            {
-                               Name       = localPlayer.Name.ExtractText(),
-                               Server     = localPlayer.HomeWorld.Value.Name.ExtractText(),
-                               JobId      = localPlayer.ClassJob.RowId,
+                               Name       = localPlayer.Name.ToString(),
+                               Server     = localPlayer.HomeWorld.Value.Name.ToString(),
+                               JobID      = localPlayer.ClassJob.RowId,
                                Level      = localPlayer.Level,
                                DeathCount = 0
                            });
         }
-        else
-            return;
-
-        // progress
-        phaseIndex    = 0;
-        subphaseIndex = -1;
-
-        // start phase
-        EnterPhase(0);
     }
 
-    /// <summary>
-    ///     when duty is completed or wiped, finalize the fight record snapshot and upload it to the API.
-    /// </summary>
     public void CompletedSnap()
     {
         // time
-        var endTime  = lastCombatOptOutTime ?? DateTime.UtcNow;
+        var endTime = lastCombatOptOutTime ?? DateTime.UtcNow;
+        endTime = endTime > startTime ? endTime : DateTime.UtcNow;
         var duration = (endTime - startTime).Ticks * 100;
 
         // progress
         var progress = new FightProgressPayload
         {
-            Phase    = (uint)Math.Max(phaseIndex, 0),
-            Subphase = (uint)Math.Max(subphaseIndex, 0),
-            EnemyId  = enemyId,
-            EnemyHp  = enemyHp
+            PhaseID    = (uint)Math.Max(phaseIndex, 0),
+            SubphaseID = (uint)Math.Max(subphaseIndex, 0),
+            EnemyID    = enemyID,
+            EnemyHP    = enemyHP
         };
 
         // payload
@@ -255,7 +210,7 @@ public class FightContext
         {
             StartTime = startTime,
             Duration  = duration,
-            ZoneId    = dutyConfig.ZoneId,
+            ZoneID    = dutyConfig.ZoneID,
             Players   = players.Values.ToList(),
             IsClear   = isClear,
             Progress  = progress
@@ -269,15 +224,37 @@ public class FightContext
 
     #region StateMachine
 
-    /// <summary>
-    ///     enter a new phase, register listeners, reset checkpoints.
-    /// </summary>
-    /// <param name="phaseId">phase index to enter</param>
-    private void EnterPhase(int phaseId)
+    private void ResetState()
+    {
+        // lifecycle
+        PluginContext.Lifecycle = EngineState.Ready;
+        isClear                 = false;
+
+        // progress
+        phaseIndex    = 0;
+        subphaseIndex = -1;
+
+        // clear listeners & checkpoints
+        listenerManager.Clear();
+        completedCheckpoints.Clear();
+
+        // variables
+        variables.Clear();
+        foreach (var vars in dutyConfig.Variables)
+            variables[vars.Name] = vars.Initial;
+
+        // enter start phase
+        EnterPhase(0);
+
+        // update context
+        UpdateContext();
+    }
+
+    private void EnterPhase(int phaseID)
     {
         // phase transition
-        var phase = dutyConfig.Timeline.Phases[phaseId];
-        phaseIndex    = phaseId;
+        var phase = dutyConfig.Timeline.Phases[phaseID];
+        phaseIndex    = phaseID;
         subphaseIndex = -1;
 
         // clear triggers
@@ -288,14 +265,15 @@ public class FightContext
 
         // mechanics
         // from checkpoints
-        var mechanics = new HashSet<string>(phase.Checkpoints);
+        var mechanics = new HashSet<string>(phase.CheckpointNames);
         // from transitions
         foreach (var transition in phase.Transitions)
         {
             foreach (var condition in transition.Conditions)
             {
-                if (condition.Type == "MECHANIC_TRIGGERED")
-                    mechanics.Add(condition.MechanicName);
+                if (condition.Type != "MECHANIC_TRIGGERED")
+                    continue;
+                mechanics.Add(condition.MechanicName);
             }
         }
 
@@ -304,23 +282,19 @@ public class FightContext
             listenerManager.Register(new ListenerState(mechanic, mechanic.Trigger));
 
         // enemy
-        enemyId = phase.TargetId;
+        enemyID = phase.TargetID;
 
         // update context (phase change)
         UpdateContext();
     }
 
-    /// <summary>
-    ///     emit a mechanic, update progress, and check for phase transition.
-    /// </summary>
-    /// <param name="mechanic">mechanic emitted</param>
     private void EmitMechanic(Mechanic mechanic)
     {
         completedCheckpoints.Add(mechanic.Name);
 
         // update progress
         var phase            = dutyConfig.Timeline.Phases[phaseIndex];
-        var newSubphaseIndex = phase.Checkpoints.IndexOf(mechanic.Name);
+        var newSubphaseIndex = phase.CheckpointNames.IndexOf(mechanic.Name);
         if (newSubphaseIndex >= subphaseIndex)
             subphaseIndex = newSubphaseIndex;
 
@@ -335,10 +309,6 @@ public class FightContext
         UpdateContext();
     }
 
-    /// <summary>
-    ///     emit an action, update variables, and check for phase transition.
-    /// </summary>
-    /// <param name="action">action emitted</param>
     private void EmitAction(Action action)
     {
         // update variables
@@ -360,10 +330,6 @@ public class FightContext
         UpdateContext();
     }
 
-    /// <summary>
-    ///     check if a mechanic triggered a phase transition.
-    /// </summary>
-    /// <param name="mechanic">mechanic emitted</param>
     private void CheckTransition(Mechanic mechanic)
     {
         var phase = dutyConfig.Timeline.Phases[phaseIndex];
@@ -371,8 +337,7 @@ public class FightContext
         {
             if (transition.Conditions
                           .Where(x => x.Type == "MECHANIC_TRIGGERED")
-                          .Any(x => x.MechanicName == mechanic.Name)
-               )
+                          .Any(x => x.MechanicName == mechanic.Name))
             {
                 EnterPhase(dutyConfig.Timeline.Phases.IndexOf(x => x.Name == transition.TargetPhase));
                 return;
@@ -380,10 +345,6 @@ public class FightContext
         }
     }
 
-    /// <summary>
-    ///     check if a variable change triggered a phase transition.
-    /// </summary>
-    /// <param name="variable">variable name changed</param>
     private void CheckTransition(string variable)
     {
         var phase = dutyConfig.Timeline.Phases[phaseIndex];
@@ -391,8 +352,7 @@ public class FightContext
         {
             if (transition.Conditions
                           .Where(x => x.Type == "EXPRESSION")
-                          .Any(x => x.Expression.Contains(variable) && CheckExpression(x.Expression))
-               )
+                          .Any(x => x.Expression.Contains(variable) && CheckExpression(x.Expression)))
             {
                 EnterPhase(dutyConfig.Timeline.Phases.IndexOf(x => x.Name == transition.TargetPhase));
                 return;
@@ -400,13 +360,7 @@ public class FightContext
         }
     }
 
-    /// <summary>
-    ///     check if an event matches a trigger.
-    /// </summary>
-    /// <param name="trigger">trigger to check</param>
-    /// <param name="e">event to match</param>
-    /// <returns>true if matches, otherwise false</returns>
-    private bool CheckTrigger(Trigger trigger, IEvent? e = null)
+    private static bool CheckTrigger(Trigger trigger, IEvent? e = null)
     {
         switch (trigger.Type)
         {
@@ -427,11 +381,6 @@ public class FightContext
         }
     }
 
-    /// <summary>
-    ///     check if an expression is true.
-    /// </summary>
-    /// <param name="expression">expression to check</param>
-    /// <returns>true if true, otherwise false</returns>
     private bool CheckExpression(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression))
@@ -457,23 +406,16 @@ public class FightContext
             var currentValue = Convert.ToDouble(currentValueObj);
             var targetValue  = Convert.ToDouble(literalValueStr);
 
-            switch (op)
+            return op switch
             {
-                case "==":
-                    return Math.Abs(currentValue - targetValue) < 0.05;
-                case "!=":
-                    return Math.Abs(currentValue - targetValue) > 0.05;
-                case ">":
-                    return currentValue > targetValue;
-                case ">=":
-                    return currentValue >= targetValue;
-                case "<":
-                    return currentValue < targetValue;
-                case "<=":
-                    return currentValue <= targetValue;
-                default:
-                    return false;
-            }
+                "==" => Math.Abs(currentValue - targetValue) < 0.05,
+                "!=" => Math.Abs(currentValue - targetValue) > 0.05,
+                ">" => currentValue > targetValue,
+                ">=" => currentValue >= targetValue,
+                "<" => currentValue < targetValue,
+                "<=" => currentValue <= targetValue,
+                _ => false
+            };
         }
         catch (Exception) { return false; }
     }

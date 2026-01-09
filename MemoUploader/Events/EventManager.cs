@@ -66,23 +66,23 @@ public class EventManager
         DService.Condition.ConditionChange -= OnConditionChange;
     }
 
-    private void RaiseEvent(IEvent e)
-        => OnEvent?.Invoke(e);
+    private void RaiseEvent(IEvent e) =>
+        OnEvent?.Invoke(e);
 
-    private void OnTerritoryChanged(ushort zoneId)
-        => RaiseEvent(new TerritoryChanged(zoneId));
+    private void OnTerritoryChanged(ushort zoneId) =>
+        RaiseEvent(new TerritoryChanged(zoneId));
 
-    private void OnDutyStarted(object? sender, ushort e)
-        => RaiseEvent(new DutyStarted());
+    private void OnDutyStarted(object? sender, ushort e) =>
+        RaiseEvent(new DutyStarted());
 
-    private void OnDutyRecommenced(object? sender, ushort e)
-        => RaiseEvent(new DutyRecommenced());
+    private void OnDutyRecommenced(object? sender, ushort e) =>
+        RaiseEvent(new DutyRecommenced());
 
-    private void OnDutyCompleted(object? sender, ushort e)
-        => RaiseEvent(new DutyCompleted());
+    private void OnDutyCompleted(object? sender, ushort e) =>
+        RaiseEvent(new DutyCompleted());
 
-    private void OnDutyWiped(object? sender, ushort e)
-        => RaiseEvent(new DutyWiped());
+    private void OnDutyWiped(object? sender, ushort e) =>
+        RaiseEvent(new DutyWiped());
 
     private void OnConditionChange(ConditionFlag flag, bool value)
     {

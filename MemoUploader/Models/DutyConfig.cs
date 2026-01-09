@@ -7,13 +7,13 @@ namespace MemoUploader.Models;
 public class DutyConfig
 {
     [JsonProperty("zone_id")]
-    public uint ZoneId { get; set; }
+    public uint ZoneID { get; set; }
 
     [JsonProperty("name")]
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("name_en")]
-    public string NameEn { get; set; } = string.Empty;
+    public string NameEnglish { get; set; } = string.Empty;
 
     [JsonProperty("code")]
     public string Code { get; set; } = string.Empty;
@@ -58,7 +58,7 @@ public class Mechanic
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("name_en")]
-    public string NameEn { get; set; } = string.Empty;
+    public string NameEnglish { get; set; } = string.Empty;
 
     [JsonProperty("trigger")]
     public required Trigger Trigger { get; set; }
@@ -82,10 +82,10 @@ public class Phase
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("target_id")]
-    public uint TargetId { get; set; }
+    public uint TargetID { get; set; }
 
     [JsonProperty("checkpoints")]
-    public List<string> Checkpoints { get; set; } = [];
+    public List<string> CheckpointNames { get; set; } = [];
 
     [JsonProperty("transitions")]
     public List<Transition> Transitions { get; set; } = [];
@@ -121,19 +121,19 @@ public class Trigger
     public string Status { get; set; } = string.Empty;
 
     [JsonProperty("action_id")]
-    public uint? ActionId { get; set; }
+    public uint? ActionID { get; set; }
 
     [JsonProperty("npc_id")]
-    public uint? NpcId { get; set; }
+    public uint? NPCID { get; set; }
 
     [JsonProperty("value")]
     public double? Value { get; set; }
 
     [JsonProperty("condition")]
-    public string Condition { get; set; } = string.Empty;
+    public string ConditionLambda { get; set; } = string.Empty;
 
     [JsonProperty("status_id")]
-    public uint? StatusId { get; set; }
+    public uint? StatusID { get; set; }
 
     [JsonProperty("stack_count")]
     public int? StackCount { get; set; }

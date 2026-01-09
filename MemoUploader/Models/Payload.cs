@@ -14,7 +14,7 @@ public class FightRecordPayload
     public long Duration { get; set; } // nano seconds
 
     [JsonProperty("zone_id")]
-    public uint ZoneId { get; set; }
+    public uint ZoneID { get; set; }
 
     [JsonProperty("players")]
     public List<PlayerPayload> Players { get; set; } = [];
@@ -35,7 +35,7 @@ public class PlayerPayload
     public string Server { get; set; } = string.Empty;
 
     [JsonProperty("job_id")]
-    public uint JobId { get; set; }
+    public uint JobID { get; set; }
 
     [JsonProperty("level")]
     public uint Level { get; set; }
@@ -47,14 +47,14 @@ public class PlayerPayload
 public class FightProgressPayload
 {
     [JsonProperty("phase")]
-    public uint Phase { get; set; }
+    public uint PhaseID { get; set; }
 
     [JsonProperty("subphase")]
-    public uint Subphase { get; set; }
+    public uint SubphaseID { get; set; }
 
     [JsonProperty("enemy_id")]
-    public uint EnemyId { get; set; }
+    public uint EnemyID { get; set; }
 
     [JsonProperty("enemy_hp")]
-    public double EnemyHp { get; set; }
+    public double EnemyHP { get; set; }
 }

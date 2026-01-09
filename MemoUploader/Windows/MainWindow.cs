@@ -10,67 +10,67 @@ namespace MemoUploader.Windows;
 public class MainWindow : Window, IDisposable
 {
     // window
-    private Tab currentTab = Tab.Status;
+    private readonly Tab currentTab = Tab.Status;
 
     // event recorder
     private string eventFilter = string.Empty;
 
-    public MainWindow() : base("SuMemo Uploader##sumemo-uploader-main", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+    public MainWindow() : base(
+        "酥卷记录仪##sumemo-uploader-main",
+        ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoBackground
+    )
     {
         // window
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(375, 330),
+            MinimumSize = new Vector2(240, 220),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
     }
 
     public void Dispose() { }
 
+    // public override void PreDraw()
+    // {
+    //     ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 20.0f);
+    //     ImGui.PushStyleColor(ImGuiCol.WindowBg, KnownColor.LightPink.ToVector4() with { W = 1f });
+    // }
+    //
+    // public override void PostDraw()
+    // {
+    //     ImGui.PopStyleColor(1);
+    //     ImGui.PopStyleVar(1);
+    // }
+
     public override void Draw()
     {
-        var slate = new Vector4(0.15f, 0.15f, 0.15f, 1.0f);
-
-        using var rounding    = ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, 8.0f);
-        using var borderSize  = ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 1.4f);
-        using var childColor  = ImRaii.PushColor(ImGuiCol.ChildBg, slate);
-        using var borderColor = ImRaii.PushColor(ImGuiCol.Border, Wheat3);
-
-        using var table = ImRaii.Table("MainWindowTable", 2, ImGuiTableFlags.Resizable | ImGuiTableFlags.NoBordersInBody);
-        if (!table)
-            return;
-
-        ImGui.TableSetupColumn("Sidebar", ImGuiTableColumnFlags.WidthFixed, 150f);
-        ImGui.TableSetupColumn("Content");
-
-        ImGui.TableNextRow();
-        ImGui.TableNextColumn();
+        using var rounding   = ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, 15.0f);
+        using var borderSize = ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 1.2f);
 
         using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(16, 16)))
-        using (ImRaii.Child("SidebarChild", Vector2.Zero, true, ImGuiWindowFlags.NoScrollbar))
-            DrawSidebar();
+        using (ImRaii.PushColor(ImGuiCol.Border, KnownColor.LightPink.ToVector4()))
+        using (ImRaii.PushColor(ImGuiCol.ChildBg, KnownColor.LightPink.ToVector4() with { W = 0.6f }))
+        using (ImRaii.Child("SidebarChild", new Vector2(0, 64.0f), true, ImGuiWindowFlags.NoScrollbar))
+            DrawHeader();
 
-        ImGui.TableNextColumn();
+        ImGui.Spacing();
 
-        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(24, 24)))
-        using (ImRaii.Child("ContentChild", Vector2.Zero, true))
-            DrawContent();
+        if (currentTab != Tab.Status || currentTab == Tab.Status && PluginContext.Lifecycle == EngineState.InProgress)
+        {
+            using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(24, 24)))
+            using (ImRaii.PushColor(ImGuiCol.Border, KnownColor.LightSkyBlue.ToVector4()))
+            using (ImRaii.PushColor(ImGuiCol.ChildBg, KnownColor.LightSkyBlue.ToVector4() with { W = 0.4f }))
+            using (ImRaii.Child("ContentChild", Vector2.Zero, true))
+                DrawContent();
+        }
     }
 
-    private void DrawSidebar()
+    private void DrawHeader()
     {
-        if (ImGuiOm.SelectableTextCentered("状态", currentTab == Tab.Status))
-            currentTab = Tab.Status;
-
-        if (ImGuiOm.SelectableTextCentered("设置", currentTab == Tab.Settings))
-            currentTab = Tab.Settings;
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        if (ImGuiOm.SelectableTextCentered("事件", currentTab == Tab.EventQueue))
-            currentTab = Tab.EventQueue;
+        DrawEngineState();
+        ImGui.SameLine();
+        if (DrawButton("关闭窗口", true, fill: false))
+            IsOpen = false;
     }
 
     private void DrawContent()
@@ -78,7 +78,7 @@ public class MainWindow : Window, IDisposable
         switch (currentTab)
         {
             case Tab.Status:
-                DrawStatusTab();
+                DrawProgressTab();
                 break;
             case Tab.Settings:
                 DrawSettingsTab();
@@ -91,106 +91,87 @@ public class MainWindow : Window, IDisposable
         }
     }
 
+    private void DrawEngineState()
+    {
+        string message;
+        string detail;
+        var    color = KnownColor.Beige;
+
+        switch (PluginContext.Lifecycle)
+        {
+            case EngineState.InProgress:
+                message = "解析中";
+                detail  = "正在记录战斗数据";
+                color   = KnownColor.DarkSeaGreen;
+                break;
+
+            case EngineState.Ready:
+            case EngineState.Completed:
+                message = "准备就绪";
+                detail  = "等待战斗开始";
+                color   = KnownColor.DarkGoldenrod;
+                break;
+
+            default:
+                message = "休眠中";
+                detail  = "进入特定战斗自动开启";
+                color   = KnownColor.DarkSalmon;
+                break;
+        }
+
+        DrawText(message, color.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
+        ImGui.SameLine();
+        DrawText(detail, secondaryBtnNormal, KnownColor.Beige.ToVector4());
+    }
+
     private void DrawSettingsTab() { }
 
-    private void DrawStatusTab()
+    private void DrawProgressTab()
     {
-        // engine status
-        if (ImGui.BeginTable("StatusTable", 2, ImGuiTableFlags.None))
+        if (PluginContext.CurrentPhase == "N/A")
         {
-            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 100f);
-            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
-
-            ImGui.TableNextRow();
-            ImGui.TableSetColumnIndex(0);
-            ImGui.TextColored(LightSkyBlue, "解析引擎");
-
-            ImGui.TableSetColumnIndex(1);
-            var state = PluginContext.Lifecycle;
-            var (color, slug) = state switch
-            {
-                EngineState.Ready => (Gold, "准备就绪"),
-                EngineState.InProgress => (LimeGreen, "解析中"),
-                EngineState.Completed => (DeepSkyBlue, "完成解析"),
-                _ => (Tomato, "关闭")
-            };
-            ImGui.TextColored(color, slug);
-
-            ImGui.EndTable();
+            DrawText("当前副本暂无细粒度划分", KnownColor.CornflowerBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
+            return;
         }
 
-        if (PluginContext.Lifecycle is not EngineState.InProgress)
-            return;
-
-        ImGui.Separator();
-
-        // fight progress
-        if (ImGui.BeginTable("ProgressTable", 2, ImGuiTableFlags.None))
+        DrawText(PluginContext.CurrentPhase, KnownColor.RoyalBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
+        if (!string.IsNullOrEmpty(PluginContext.CurrentSubphase))
         {
-            ImGui.TableSetupColumn("Label", ImGuiTableColumnFlags.WidthFixed, 100f);
-            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.SameLine();
+            DrawText(PluginContext.CurrentSubphase, KnownColor.CornflowerBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
+        }
 
-            ImGui.TableNextRow();
-            ImGui.TableSetColumnIndex(0);
-            ImGui.TextColored(LightSkyBlue, "战斗进度");
+        ImGui.Spacing();
 
-            ImGui.TableSetColumnIndex(1);
-            ImGui.TextColored(Gold, PluginContext.CurrentPhase);
-            if (!string.IsNullOrEmpty(PluginContext.CurrentSubphase))
-            {
+        var first = true;
+        foreach (var (name, completed) in PluginContext.Checkpoints)
+        {
+            var textWidth = ImGui.CalcTextSize(name).X + 16.0f * 2;
+            if (!first)
                 ImGui.SameLine();
-                ImGui.TextColored(LightSkyBlue, $"{PluginContext.CurrentSubphase}");
-            }
-            ImGui.EndTable();
+            first = false;
+            if (ImGui.GetContentRegionAvail().X < textWidth)
+                ImGui.NewLine();
+            var statusColor = completed ? KnownColor.DarkSeaGreen : KnownColor.DarkSalmon;
+            DrawText(name, statusColor.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
         }
 
-        ImGui.Spacing();
-
-        // checkpoints
-        if (ImGui.BeginTable("CheckpointsTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
-        {
-            // 表头
-            ImGui.TableSetupColumn("检查点", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("状态", ImGuiTableColumnFlags.WidthFixed, 80f);
-            ImGui.TableHeadersRow();
-
-            // 表格内容
-            foreach (var (name, completed) in PluginContext.Checkpoints)
-            {
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0);
-                ImGui.Text(name);
-
-                ImGui.TableSetColumnIndex(1);
-                var statusText  = completed ? "已完成" : "未完成";
-                var statusColor = completed ? LightGreen : LightSkyBlue;
-                ImGui.TextColored(statusColor, statusText);
-            }
-            ImGui.EndTable();
-        }
-
-        if (PluginContext.Variables.Count <= 0)
-            return;
-
-        ImGui.Spacing();
-
-        if (ImGui.BeginTable("VariablesTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
-        {
-            ImGui.TableSetupColumn("变量", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("当前值", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableHeadersRow();
-
-            foreach (var (key, value) in PluginContext.Variables)
-            {
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0);
-                ImGui.Text(key);
-
-                ImGui.TableSetColumnIndex(1);
-                ImGui.TextColored(Gold, value?.ToString() ?? "null");
-            }
-            ImGui.EndTable();
-        }
+        // if (PluginContext.VariableStats.Count <= 0)
+        //     return;
+        //
+        // ImGui.Spacing();
+        //
+        // first = true;
+        // foreach (var (key, value) in PluginContext.VariableStats)
+        // {
+        //     var textWidth = ImGui.CalcTextSize($"{key}: {value}").X + 16.0f * 2;
+        //     if (!first)
+        //         ImGui.SameLine();
+        //     first = false;
+        //     if (ImGui.GetContentRegionAvail().X < textWidth)
+        //         ImGui.NewLine();
+        //     DrawText($"{key}: {value}", KnownColor.SlateGray.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
+        // }
     }
 
     private void DrawEventQueueTab()
@@ -201,7 +182,7 @@ public class MainWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.BeginChild("EventHistoryChild", Vector2.Zero, false);
+        ImGui.BeginChild("EventHistoryChild", Vector2.Zero);
         {
             if (ImGui.BeginTable("EventLogTable", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit))
             {
@@ -239,6 +220,63 @@ public class MainWindow : Window, IDisposable
         }
         ImGui.EndChild();
     }
+
+    #region Colors
+
+    private readonly Vector4 primaryBtnNormal   = KnownColor.HotPink.ToVector4() with { W = 0.6f };
+    private readonly Vector4 primaryBtnHovered  = KnownColor.HotPink.ToVector4() with { W = 0.8f };
+    private readonly Vector4 primaryBtnActive   = KnownColor.DeepPink.ToVector4() with { W = 0.8f };
+    private readonly Vector4 primaryBtnSelected = KnownColor.DeepPink.ToVector4() with { W = 0.6f };
+
+    private readonly Vector4 secondaryBtnNormal   = KnownColor.CornflowerBlue.ToVector4() with { W = 0.6f };
+    private readonly Vector4 secondaryBtnHovered  = KnownColor.CornflowerBlue.ToVector4() with { W = 0.8f };
+    private readonly Vector4 secondaryBtnActive   = KnownColor.RoyalBlue.ToVector4() with { W = 0.8f };
+    private readonly Vector4 secondaryBtnSelected = KnownColor.RoyalBlue.ToVector4() with { W = 0.8f };
+
+    #endregion
+
+    #region Components
+
+    private bool DrawButton(string label, bool isSelected, bool primary = true, bool fill = true, float height = 32.0f)
+    {
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, 8.0f);
+
+        // theme
+        var normalColor   = primary ? primaryBtnNormal : secondaryBtnNormal;
+        var hoveredColor  = primary ? primaryBtnHovered : secondaryBtnHovered;
+        var activeColor   = primary ? primaryBtnActive : secondaryBtnActive;
+        var selectedColor = primary ? primaryBtnSelected : secondaryBtnSelected;
+
+        // color
+        var       baseColor   = isSelected ? selectedColor : normalColor;
+        using var colorBtn    = ImRaii.PushColor(ImGuiCol.Button, baseColor);
+        using var colorHover  = ImRaii.PushColor(ImGuiCol.ButtonHovered, isSelected ? selectedColor * 1.1f : hoveredColor);
+        using var colorActive = ImRaii.PushColor(ImGuiCol.ButtonActive, activeColor);
+
+        // size
+        var width = fill ? ImGui.GetContentRegionAvail().X : ImGui.CalcTextSize(label).X + 16.0f * 2;
+
+        // draw
+        var clicked = ImGui.Button(label, new Vector2(width, height));
+
+        return clicked;
+    }
+
+    private void DrawText(string text, Vector4 bgColor, Vector4 textColor, float height = 32.0f)
+    {
+        using var round    = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, 8.0f);
+        var       textSize = ImGui.CalcTextSize(text).X + 16.0f * 2;
+
+        // color
+        using var c1 = ImRaii.PushColor(ImGuiCol.Button, bgColor);
+        using var c2 = ImRaii.PushColor(ImGuiCol.ButtonHovered, bgColor);
+        using var c3 = ImRaii.PushColor(ImGuiCol.ButtonActive, bgColor);
+        using var c4 = ImRaii.PushColor(ImGuiCol.Text, textColor);
+
+        ImGui.Button(text, new Vector2(textSize, height));
+    }
+
+    #endregion
 
     private enum Tab
     {

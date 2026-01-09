@@ -7,12 +7,12 @@ namespace MemoUploader;
 public static class PluginContext
 {
     // recorder
-    public static IReadOnlyList<EventLog> EventHistory = [];
+    public static IReadOnlyList<EventLog> EventHistory { get; set; } = [];
 
     // fight context
-    public static EngineState?                         Lifecycle;
-    public static string                               CurrentPhase    = string.Empty;
-    public static string                               CurrentSubphase = string.Empty;
-    public static IReadOnlyList<(string, bool)>        Checkpoints     = [];
-    public static IReadOnlyDictionary<string, object?> Variables       = new Dictionary<string, object?>();
+    public static EngineState?                         Lifecycle       { get; set; }
+    public static string                               CurrentPhase    { get; set; } = string.Empty;
+    public static string                               CurrentSubphase { get; set; } = string.Empty;
+    public static IReadOnlyList<(string, bool)>        Checkpoints     { get; set; } = [];
+    public static IReadOnlyDictionary<string, object?> VariableStats   { get; set; } = new Dictionary<string, object?>();
 }

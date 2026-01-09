@@ -17,15 +17,15 @@ public interface IEvent
 public record EventLog(DateTime Time, string Category, string Message);
 
 // GENERAL EVENTS
-public record TerritoryChanged(ushort ZoneId) : IEvent
+public record TerritoryChanged(ushort zoneID) : IEvent
 {
     public override string ToString()
     {
         var zoneName = "Unknown";
-        if (LuminaGetter.TryGetRow<TerritoryType>(ZoneId, out var zone))
-            zoneName = zone.PlaceName.Value.Name.ExtractText();
+        if (LuminaGetter.TryGetRow<TerritoryType>(zoneID, out var zone))
+            zoneName = zone.PlaceName.Value.Name.ToString();
 
-        return $"{zoneName} ({ZoneId})";
+        return $"{zoneName} ({zoneID})";
     }
 }
 
@@ -35,7 +35,7 @@ public record TerritoryChanged(ushort ZoneId) : IEvent
 public interface IActionEvent : IEvent
 {
     IGameObject Object   { get; }
-    uint        ActionId { get; }
+    uint        ActionID { get; }
 
     string Status => this switch
     {
@@ -48,24 +48,23 @@ public interface IActionEvent : IEvent
     {
         if (trigger.Type != "ACTION_EVENT")
             return false;
-        var actionMatch = trigger.ActionId.HasValue && trigger.ActionId.Value == ActionId;
+        var actionMatch = trigger.ActionID.HasValue && trigger.ActionID.Value == ActionID;
         var statusMatch = trigger.Status == Status;
         return actionMatch && statusMatch;
     }
 
     string IEvent.FormatMessage()
     {
-        var actionName = LuminaGetter.TryGetRow<LuminaAction>(ActionId, out var action)
-                             ? action.Name.ExtractText()
+        var actionName = LuminaGetter.TryGetRow<LuminaAction>(ActionID, out var action)
+                             ? action.Name.ToString()
                              : "Unknown";
 
-        return $"{Object.Name.ExtractText()} ({Object.DataId}) - {actionName} ({ActionId})";
+        return $"{Object.Name} ({Object.DataID}) - {actionName} ({ActionID})";
     }
 }
 
-public record ActionStart(IGameObject Object, uint ActionId) : IActionEvent { }
-
-public record ActionCompleted(IGameObject Object, uint ActionId) : IActionEvent { }
+public record ActionStart(IGameObject     Object, uint ActionID) : IActionEvent { }
+public record ActionCompleted(IGameObject Object, uint ActionID) : IActionEvent { }
 
 #endregion
 
@@ -89,20 +88,17 @@ public interface ICombatantEvent : IEvent
     {
         if (trigger.Type != "COMBATANT_EVENT")
             return false;
-        var combatantMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == Object.DataId;
+        var combatantMatch = trigger.NPCID.HasValue && trigger.NPCID.Value == Object.DataID;
         var statusMatch    = trigger.Status == Status;
         return combatantMatch && statusMatch;
     }
 
-    string IEvent.FormatMessage() => $"{Object.Name.ExtractText()} ({Object.DataId}) - {Status}";
+    string IEvent.FormatMessage() => $"{Object.Name} ({Object.DataID}) - {Status}";
 }
 
-public record CombatantSpawn(IGameObject Object) : ICombatantEvent { }
-
-public record CombatantDestroy(IGameObject Object) : ICombatantEvent { }
-
-public record CombatantTargetable(IGameObject Object) : ICombatantEvent { }
-
+public record CombatantSpawn(IGameObject        Object) : ICombatantEvent { }
+public record CombatantDestroy(IGameObject      Object) : ICombatantEvent { }
+public record CombatantTargetable(IGameObject   Object) : ICombatantEvent { }
 public record CombatantUntargetable(IGameObject Object) : ICombatantEvent { }
 
 #endregion
@@ -112,8 +108,8 @@ public record CombatantUntargetable(IGameObject Object) : ICombatantEvent { }
 // STATUS EVENTS
 public interface IStatusEvent : IEvent
 {
-    uint EntityId { get; }
-    uint StatusId { get; }
+    uint EntityID { get; }
+    uint StatusID { get; }
 
     string Status => this switch
     {
@@ -126,7 +122,7 @@ public interface IStatusEvent : IEvent
     {
         if (trigger.Type != "STATUS_EVENT")
             return false;
-        var staMatch    = trigger.StatusId.HasValue && trigger.StatusId.Value == StatusId;
+        var staMatch    = trigger.StatusID.HasValue && trigger.StatusID.Value == StatusID;
         var statusMatch = trigger.Status == Status;
         return staMatch && statusMatch;
     }
@@ -134,20 +130,19 @@ public interface IStatusEvent : IEvent
     string IEvent.FormatMessage()
     {
         var objName = "Unknown";
-        if (DService.ObjectTable.SearchByEntityId(EntityId) is { } obj)
+        if (DService.ObjectTable.SearchByEntityID(EntityID) is { } obj)
             objName = obj.Name.ToString();
 
         var statusName = "Unknown";
-        if (LuminaGetter.TryGetRow<LuminaStatus>(StatusId, out var status))
-            statusName = status.Name.ExtractText();
+        if (LuminaGetter.TryGetRow<LuminaStatus>(StatusID, out var status))
+            statusName = status.Name.ToString();
 
-        return $"{objName} ({EntityId}) - {statusName} ({StatusId})";
+        return $"{objName} ({EntityID}) - {statusName} ({StatusID})";
     }
 }
 
-public record StatusApplied(uint EntityId, uint StatusId) : IStatusEvent { }
-
-public record StatusRemoved(uint EntityId, uint StatusId) : IStatusEvent { }
+public record StatusApplied(uint EntityID, uint StatusID) : IStatusEvent { }
+public record StatusRemoved(uint EntityID, uint StatusID) : IStatusEvent { }
 
 #endregion
 
@@ -170,11 +165,8 @@ public interface IDutyEvent : IEvent
 }
 
 public record DutyStarted : IDutyEvent { }
-
 public record DutyRecommenced : IDutyEvent { }
-
 public record DutyCompleted : IDutyEvent { }
-
 public record DutyWiped : IDutyEvent { }
 
 #endregion
@@ -196,7 +188,6 @@ public interface IConditionEvent : IEvent
 }
 
 public record CombatOptIn : IConditionEvent { }
-
 public record CombatOptOut : IConditionEvent { }
 
 #endregion
@@ -206,7 +197,7 @@ public record CombatOptOut : IConditionEvent { }
 // FIGHT EVENTS
 public record Death(IGameObject Object) : IEvent
 {
-    string IEvent.FormatMessage() => $"{Object.Name.ExtractText()} ({Object.EntityId})";
+    string IEvent.FormatMessage() => $"{Object.Name} ({Object.EntityID})";
 }
 
 #endregion
