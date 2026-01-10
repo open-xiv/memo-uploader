@@ -1,48 +1,49 @@
 ﻿using System;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MemoUploader.Models;
 
 
 namespace MemoUploader.Events;
 
-public unsafe class StatusManager(Action<IEvent> eventRaiser)
+public class StatusManager(Action<IEvent> eventRaiser)
 {
     public void Init()
     {
-        PlayerStatusManager.RegGainStatus(OnStatusAppliedHook);
-        PlayerStatusManager.RegLoseStatus(OnStatusRemovedHook);
+        PlayerStatusManager.Instance().RegGain(OnStatusAppliedHook);
+        PlayerStatusManager.Instance().RegLose(OnStatusRemovedHook);
     }
 
     public void Uninit()
     {
-        PlayerStatusManager.Unreg(OnStatusAppliedHook);
-        PlayerStatusManager.Unreg(OnStatusRemovedHook);
+        PlayerStatusManager.Instance().Unreg(OnStatusAppliedHook);
+        PlayerStatusManager.Instance().Unreg(OnStatusRemovedHook);
     }
 
-    private void OnStatusAppliedHook(
-        BattleChara* player,
-        ushort       statusID,
+    private void OnStatusAppliedHook
+    (
+        IBattleChara player,
+        ushort       statusId,
         ushort       param,
         ushort       stackCount,
         TimeSpan     remainingTime,
-        ulong        sourceID)
+        ulong        sourceId
+    )
     {
         if (PluginContext.Lifecycle is null)
             return;
 
-        try { eventRaiser(new StatusApplied(player->EntityId, statusID)); }
+        try { eventRaiser(new StatusApplied(player.EntityID, statusId)); }
         catch
         {
             // ignored
         }
     }
 
-    private void OnStatusRemovedHook(BattleChara* player, ushort statusID, ushort param, ushort stackCount, ulong sourceID)
+    private void OnStatusRemovedHook(IBattleChara player, ushort statusId, ushort param, ushort stackCount, ulong sourceId)
     {
         if (PluginContext.Lifecycle is null)
             return;
 
-        try { eventRaiser(new StatusRemoved(player->EntityId, statusID)); }
+        try { eventRaiser(new StatusRemoved(player.EntityID, statusId)); }
         catch
         {
             // ignored

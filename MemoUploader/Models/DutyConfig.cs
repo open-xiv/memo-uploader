@@ -7,7 +7,7 @@ namespace MemoUploader.Models;
 public class DutyConfig
 {
     [JsonProperty("zone_id")]
-    public uint ZoneID { get; set; }
+    public uint ZoneId { get; set; }
 
     [JsonProperty("name")]
     public string Name { get; set; } = string.Empty;
@@ -82,7 +82,7 @@ public class Phase
     public string Name { get; set; } = string.Empty;
 
     [JsonProperty("target_id")]
-    public uint TargetID { get; set; }
+    public uint TargetId { get; set; }
 
     [JsonProperty("checkpoints")]
     public List<string> CheckpointNames { get; set; } = [];
@@ -121,10 +121,10 @@ public class Trigger
     public string Status { get; set; } = string.Empty;
 
     [JsonProperty("action_id")]
-    public uint? ActionID { get; set; }
+    public uint? ActionId { get; set; }
 
     [JsonProperty("npc_id")]
-    public uint? NPCID { get; set; }
+    public uint? NpcId { get; set; }
 
     [JsonProperty("value")]
     public double? Value { get; set; }
@@ -133,7 +133,7 @@ public class Trigger
     public string ConditionLambda { get; set; } = string.Empty;
 
     [JsonProperty("status_id")]
-    public uint? StatusID { get; set; }
+    public uint? StatusId { get; set; }
 
     [JsonProperty("stack_count")]
     public int? StackCount { get; set; }

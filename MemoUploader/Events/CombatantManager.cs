@@ -15,36 +15,36 @@ public class CombatantManager(Action<IEvent> eventRaiser)
 
     private record CombatantState(bool IsTargetable, bool IsDead);
 
-    public void Init() => DService.Framework.Update += OnFrameworkUpdate;
+    public void Init() => FrameworkManager.Instance().Reg(OnFrameworkUpdate, throttleMS: 200);
 
     public void Uninit()
     {
-        DService.Framework.Update -= OnFrameworkUpdate;
+        FrameworkManager.Instance().Unreg(OnFrameworkUpdate);
         lastCombatants.Clear();
     }
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        if (!Throttler.Throttle("SumemoUploader-Combatant-Update", 200) || PluginContext.Lifecycle is null)
+        if (PluginContext.Lifecycle is null)
             return;
 
         // combatants
-        var currentCombatants = DService.ObjectTable.Where(x => x.ObjectKind is ObjectKind.BattleNpc).ToList();
+        var currentCombatants = DService.Instance().ObjectTable.Where(x => x.ObjectKind is ObjectKind.BattleNpc).ToList();
 
         // spawn
         foreach (var obj in currentCombatants.Except(lastCombatants))
-            eventRaiser(new CombatantSpawn(obj));
+            eventRaiser(new CombatantSpawned(obj.DataID));
 
         // destroy
         foreach (var obj in lastCombatants.Except(currentCombatants))
-            eventRaiser(new CombatantDestroy(obj));
+            eventRaiser(new CombatantDestroyed(obj.DataID));
 
         // update combatants
         lastCombatants.Clear();
         lastCombatants.AddRange(currentCombatants);
 
         // last states
-        var currentStates = DService.ObjectTable
+        var currentStates = DService.Instance().ObjectTable
                                     .Where(x => x.ObjectKind is ObjectKind.Player or ObjectKind.BattleNpc)
                                     .DistinctBy(x => x.EntityID)
                                     .ToDictionary(x => x.EntityID, x => x);
@@ -59,10 +59,10 @@ public class CombatantManager(Action<IEvent> eventRaiser)
             switch (lastState.IsTargetable)
             {
                 case true when !currentState.IsTargetable:
-                    eventRaiser(new CombatantUntargetable(currentState));
+                    eventRaiser(new CombatantBecameUntargetable(currentState.DataID));
                     break;
                 case false when currentState.IsTargetable:
-                    eventRaiser(new CombatantTargetable(currentState));
+                    eventRaiser(new CombatantBecameTargetable(currentState.DataID));
                     break;
             }
 
@@ -70,7 +70,7 @@ public class CombatantManager(Action<IEvent> eventRaiser)
             if (currentState.ObjectKind is not ObjectKind.Player || lastState.IsDead || !currentState.IsDead)
                 continue;
 
-            eventRaiser(new Death(currentState));
+            eventRaiser(new PlayerDied(currentState.EntityID));
         }
 
         // update states

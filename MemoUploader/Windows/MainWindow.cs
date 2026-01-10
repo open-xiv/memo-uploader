@@ -93,9 +93,9 @@ public class MainWindow : Window, IDisposable
 
     private void DrawEngineState()
     {
-        string message;
-        string detail;
-        var    color = KnownColor.Beige;
+        string     message;
+        string     detail;
+        KnownColor color;
 
         switch (PluginContext.Lifecycle)
         {

@@ -1,7 +1,5 @@
 ﻿using System;
 using Lumina.Excel.Sheets;
-using LuminaStatus = Lumina.Excel.Sheets.Status;
-using LuminaAction = Lumina.Excel.Sheets.Action;
 
 
 namespace MemoUploader.Models;
@@ -17,15 +15,15 @@ public interface IEvent
 public record EventLog(DateTime Time, string Category, string Message);
 
 // GENERAL EVENTS
-public record TerritoryChanged(ushort zoneID) : IEvent
+public record TerritoryChanged(ushort ZoneId) : IEvent
 {
     public override string ToString()
     {
         var zoneName = "Unknown";
-        if (LuminaGetter.TryGetRow<TerritoryType>(zoneID, out var zone))
+        if (LuminaGetter.TryGetRow<TerritoryType>(ZoneId, out var zone))
             zoneName = zone.PlaceName.Value.Name.ToString();
 
-        return $"{zoneName} ({zoneID})";
+        return $"{zoneName} ({ZoneId})";
     }
 }
 
@@ -34,12 +32,12 @@ public record TerritoryChanged(ushort zoneID) : IEvent
 // ACTION EVENTS
 public interface IActionEvent : IEvent
 {
-    IGameObject Object   { get; }
-    uint        ActionID { get; }
+    uint DataId   { get; }
+    uint ActionId { get; }
 
     string Status => this switch
     {
-        ActionStart _ => "START",
+        ActionStarted _ => "START",
         ActionCompleted _ => "COMPLETE",
         _ => "UNKNOWN"
     };
@@ -48,23 +46,16 @@ public interface IActionEvent : IEvent
     {
         if (trigger.Type != "ACTION_EVENT")
             return false;
-        var actionMatch = trigger.ActionID.HasValue && trigger.ActionID.Value == ActionID;
+        var actionMatch = trigger.ActionId.HasValue && trigger.ActionId.Value == ActionId;
         var statusMatch = trigger.Status == Status;
         return actionMatch && statusMatch;
     }
 
-    string IEvent.FormatMessage()
-    {
-        var actionName = LuminaGetter.TryGetRow<LuminaAction>(ActionID, out var action)
-                             ? action.Name.ToString()
-                             : "Unknown";
-
-        return $"{Object.Name} ({Object.DataID}) - {actionName} ({ActionID})";
-    }
+    string IEvent.FormatMessage() => $"{DataId} - {ActionId}";
 }
 
-public record ActionStart(IGameObject     Object, uint ActionID) : IActionEvent { }
-public record ActionCompleted(IGameObject Object, uint ActionID) : IActionEvent { }
+public record ActionStarted(uint   DataId, uint ActionId) : IActionEvent { }
+public record ActionCompleted(uint DataId, uint ActionId) : IActionEvent { }
 
 #endregion
 
@@ -73,14 +64,14 @@ public record ActionCompleted(IGameObject Object, uint ActionID) : IActionEvent 
 // COMBATANT EVENTS
 public interface ICombatantEvent : IEvent
 {
-    IGameObject Object { get; }
+    uint DataId { get; }
 
     string Status => this switch
     {
-        CombatantSpawn _ => "SPAWN",
-        CombatantDestroy _ => "DESTROY",
-        CombatantTargetable _ => "TARGETABLE",
-        CombatantUntargetable _ => "UNTARGETABLE",
+        CombatantSpawned _ => "SPAWN",
+        CombatantDestroyed _ => "DESTROY",
+        CombatantBecameTargetable _ => "TARGETABLE",
+        CombatantBecameUntargetable _ => "UNTARGETABLE",
         _ => "UNKNOWN"
     };
 
@@ -88,18 +79,27 @@ public interface ICombatantEvent : IEvent
     {
         if (trigger.Type != "COMBATANT_EVENT")
             return false;
-        var combatantMatch = trigger.NPCID.HasValue && trigger.NPCID.Value == Object.DataID;
+        var combatantMatch = trigger.NpcId.HasValue && trigger.NpcId.Value == DataId;
         var statusMatch    = trigger.Status == Status;
         return combatantMatch && statusMatch;
     }
 
-    string IEvent.FormatMessage() => $"{Object.Name} ({Object.DataID}) - {Status}";
+    string IEvent.FormatMessage() => $"{DataId}) - {Status}";
 }
 
-public record CombatantSpawn(IGameObject        Object) : ICombatantEvent { }
-public record CombatantDestroy(IGameObject      Object) : ICombatantEvent { }
-public record CombatantTargetable(IGameObject   Object) : ICombatantEvent { }
-public record CombatantUntargetable(IGameObject Object) : ICombatantEvent { }
+public record CombatantSpawned(uint            DataId) : ICombatantEvent { }
+public record CombatantDestroyed(uint          DataId) : ICombatantEvent { }
+public record CombatantBecameTargetable(uint   DataId) : ICombatantEvent { }
+public record CombatantBecameUntargetable(uint DataId) : ICombatantEvent { }
+
+#endregion
+
+#region EnemyStateEvents
+
+public record EnemyHpChanged(uint DataId, double? CurrentHp, double? MaxHp) : IEvent
+{
+    string IEvent.FormatMessage() => $"{DataId} - HP: {CurrentHp}/{MaxHp}";
+}
 
 #endregion
 
@@ -108,8 +108,8 @@ public record CombatantUntargetable(IGameObject Object) : ICombatantEvent { }
 // STATUS EVENTS
 public interface IStatusEvent : IEvent
 {
-    uint EntityID { get; }
-    uint StatusID { get; }
+    uint EntityId { get; }
+    uint StatusId { get; }
 
     string Status => this switch
     {
@@ -122,27 +122,17 @@ public interface IStatusEvent : IEvent
     {
         if (trigger.Type != "STATUS_EVENT")
             return false;
-        var staMatch    = trigger.StatusID.HasValue && trigger.StatusID.Value == StatusID;
+        var staMatch    = trigger.StatusId.HasValue && trigger.StatusId.Value == StatusId;
         var statusMatch = trigger.Status == Status;
         return staMatch && statusMatch;
     }
 
     string IEvent.FormatMessage()
-    {
-        var objName = "Unknown";
-        if (DService.ObjectTable.SearchByEntityID(EntityID) is { } obj)
-            objName = obj.Name.ToString();
-
-        var statusName = "Unknown";
-        if (LuminaGetter.TryGetRow<LuminaStatus>(StatusID, out var status))
-            statusName = status.Name.ToString();
-
-        return $"{objName} ({EntityID}) - {statusName} ({StatusID})";
-    }
+        => $"{EntityId} - {StatusId}";
 }
 
-public record StatusApplied(uint EntityID, uint StatusID) : IStatusEvent { }
-public record StatusRemoved(uint EntityID, uint StatusID) : IStatusEvent { }
+public record StatusApplied(uint EntityId, uint StatusId) : IStatusEvent { }
+public record StatusRemoved(uint EntityId, uint StatusId) : IStatusEvent { }
 
 #endregion
 
@@ -195,9 +185,9 @@ public record CombatOptOut : IConditionEvent { }
 #region FightEvents
 
 // FIGHT EVENTS
-public record Death(IGameObject Object) : IEvent
+public record PlayerDied(uint EntityId) : IEvent
 {
-    string IEvent.FormatMessage() => $"{Object.Name} ({Object.EntityID})";
+    string IEvent.FormatMessage() => $"{EntityId}";
 }
 
 #endregion

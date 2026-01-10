@@ -12,31 +12,32 @@ public class ActionManager(Action<IEvent> eventRaiser)
 {
     public void Init()
     {
-        UseActionManager.RegCharacterStartCast(OnActionStart);
-        UseActionManager.RegCharacterCompleteCast(OnActionComplete);
+        UseActionManager.Instance().RegPostCharacterStartCast(OnActionStart);
+        UseActionManager.Instance().RegPostCharacterCompleteCast(OnActionComplete);
     }
 
     public void Uninit()
     {
-        UseActionManager.Unreg(OnActionStart);
-        UseActionManager.Unreg(OnActionComplete);
+        UseActionManager.Instance().Unreg(OnActionStart);
+        UseActionManager.Instance().Unreg(OnActionComplete);
     }
 
-    private void OnActionStart(nint a1, IBattleChara player, ActionType type, uint actionID, nint a4, float rotation, float a6)
+    private void OnActionStart(bool result, IBattleChara player, ActionType type, uint actionId, nint a4, float rotation, float a6)
     {
         if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
             return;
 
-        if (DService.ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
-            eventRaiser(new ActionStart(obj, actionID));
+        if (DService.Instance().ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
+            eventRaiser(new ActionStarted(obj.DataID, actionId));
     }
 
-    private void OnActionComplete(
-        nint         a1,
+    private void OnActionComplete
+    (
+        bool         result,
         IBattleChara player,
         ActionType   type,
-        uint         actionID,
-        uint         spellID,
+        uint         actionId,
+        uint         spellId,
         GameObjectId a5,
         Vector3      a6,
         float        rotation,
@@ -48,7 +49,7 @@ public class ActionManager(Action<IEvent> eventRaiser)
         if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
             return;
 
-        if (DService.ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
-            eventRaiser(new ActionCompleted(obj, actionID));
+        if (DService.Instance().ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
+            eventRaiser(new ActionCompleted(obj.DataID, actionId));
     }
 }
