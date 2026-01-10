@@ -29,9 +29,12 @@ jobs:
               run: |
                   $targetDir = "${{ github.workspace }}\dalamud_lib"
                   New-Item -ItemType Directory -Force -Path $targetDir
-                  $url = "https://github.com/goatcorp/Dalamud/releases/latest/download/latest.zip"
-                  Invoke-WebRequest -Uri $url -OutFile "dalamud.zip"
-                  Expand-Archive -Path "dalamud.zip" -DestinationPath $targetDir
+
+                  $url = "https://github.com/AtmoOmen/Dalamud/releases/latest/download/latest.7z"
+                  $archive = "dalamud.7z"
+
+                  Invoke-WebRequest -Uri $url -OutFile $archive
+                  7z x $archive "-o$targetDir" -y
 
             - name: Restore
               run: dotnet restore
