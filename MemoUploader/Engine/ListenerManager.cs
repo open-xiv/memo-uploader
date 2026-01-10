@@ -8,10 +8,10 @@ public record ListenerState(Mechanic Mechanic, Trigger Trigger);
 
 public class ListenerManager
 {
-    private readonly Dictionary<string, Dictionary<uint, List<ListenerState>>> listeners = [];
+    private Dictionary<string, Dictionary<uint, List<ListenerState>>> listeners = [];
 
     public void Clear()
-        => listeners.Clear();
+        => listeners = [];
 
     public void Register(ListenerState state)
     {
@@ -25,9 +25,9 @@ public class ListenerManager
         var type = state.Trigger.Type;
         uint id = type switch
         {
-            "ACTION_EVENT" => state.Trigger.ActionID ?? 0,
-            "COMBATANT_EVENT" => state.Trigger.NPCID ?? 0,
-            "STATUS_EVENT" => state.Trigger.StatusID ?? 0,
+            "ACTION_EVENT" => state.Trigger.ActionId ?? 0,
+            "COMBATANT_EVENT" => state.Trigger.NpcId ?? 0,
+            "STATUS_EVENT" => state.Trigger.StatusId ?? 0,
             _ => 0
         };
 
@@ -54,9 +54,9 @@ public class ListenerManager
         };
         uint id = e switch
         {
-            IActionEvent actionEvent => actionEvent.ActionID,
-            ICombatantEvent combatantEvent => combatantEvent.Object.DataID,
-            IStatusEvent statusEvent => statusEvent.StatusID,
+            IActionEvent actionEvent => actionEvent.ActionId,
+            ICombatantEvent combatantEvent => combatantEvent.DataId,
+            IStatusEvent statusEvent => statusEvent.StatusId,
             _ => 0
         };
 

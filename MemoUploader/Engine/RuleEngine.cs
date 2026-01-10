@@ -32,11 +32,9 @@ public class RuleEngine
         if (e is TerritoryChanged tc)
         {
             fightContext?.CompletedSnap();
-            fightContext?.Uninit();
 
-            var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.zoneID);
+            var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.ZoneId);
             fightContext = dutyConfig is not null ? new FightContext(dutyConfig) : null;
-            fightContext?.Init();
         }
 
         fightContext?.ProcessEvent(e);

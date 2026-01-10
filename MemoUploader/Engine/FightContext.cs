@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Dalamud.Plugin.Services;
 using MemoUploader.Api;
 using MemoUploader.Models;
 using Action = MemoUploader.Models.Action;
@@ -28,8 +27,7 @@ public class FightContext
     private int  subphaseIndex; // checkpoint index
 
     // enemy
-    private uint   enemyID;
-    private double enemyHP;
+    private double enemyHp;
 
     #endregion
 
@@ -39,13 +37,13 @@ public class FightContext
     private ConcurrentDictionary<uint, PlayerPayload> players = [];
 
     // variables
-    private readonly ConcurrentDictionary<string, object?> variables = [];
+    private ConcurrentDictionary<string, object?> variables = [];
 
     // listener
     private readonly ListenerManager listenerManager = new();
 
     // checkpoints
-    private readonly ConcurrentBag<string> completedCheckpoints = [];
+    private ConcurrentBag<string> completedCheckpoints = [];
 
     #endregion
 
@@ -75,25 +73,7 @@ public class FightContext
         ResetState();
     }
 
-    public void Init() => DService.Framework.Update += OnFrameworkUpdate;
-
-    public void Uninit()
-    {
-        DService.Framework.Update -= OnFrameworkUpdate;
-        PluginContext.Lifecycle   =  null;
-    }
-
     #endregion
-
-    private void OnFrameworkUpdate(IFramework framework)
-    {
-        if (!Throttler.Throttle("sumemo-fight-context-update", 200))
-            return;
-
-        // main enemy hp
-        if (DService.ObjectTable.FirstOrDefault(x => x.DataID == enemyID) is IBattleChara enemy)
-            enemyHP = (double)enemy.CurrentHp / enemy.MaxHp;
-    }
 
     #region EventProcess
 
@@ -105,9 +85,24 @@ public class FightContext
         if (PluginContext.Lifecycle is not EngineState.InProgress)
             return;
 
-        // death
-        if (e is Death death && players.TryGetValue(death.Object.EntityID, out var player))
-            player.DeathCount++;
+        // specific events
+        switch (e)
+        {
+            // death
+            case PlayerDied death when players.TryGetValue(death.EntityId, out var player):
+                player.DeathCount++;
+                break;
+
+            // enemy hp change
+            case EnemyHpChanged hpChanged when hpChanged.DataId == PluginContext.EnemyDataId:
+            {
+                if (hpChanged.CurrentHp is not null && hpChanged.MaxHp is not null)
+                    enemyHp = hpChanged.CurrentHp.Value / hpChanged.MaxHp.Value;
+                else
+                    enemyHp = 0;
+                break;
+            }
+        }
 
         // listeners
         var relatedListener = listenerManager.FetchListeners(e);
@@ -146,6 +141,11 @@ public class FightContext
                 isClear                 = true;
                 CompletedSnap();
                 return;
+
+            case DutyRecommenced:
+                ResetState();
+                PluginContext.Lifecycle = EngineState.Ready;
+                break;
         }
     }
 
@@ -159,33 +159,21 @@ public class FightContext
         startTime            = DateTime.UtcNow;
         lastCombatOptOutTime = null;
 
+        // enemy hp
+        enemyHp = 1.0;
+
         // players
-        players.Clear();
-        if (DService.PartyList.Length >= 1)
+        players = [];
+        foreach (var p in PluginContext.PartyProvider.GetPartySnapshots())
         {
-            players = DService.PartyList.ToConcurrentDictionary(
-                p => p.EntityId,
-                p => new PlayerPayload
-                {
-                    Name       = p.Name.ToString(),
-                    Server     = p.World.Value.Name.ToString(),
-                    JobID      = p.ClassJob.RowId,
-                    Level      = p.Level,
-                    DeathCount = 0
-                }
-            );
-        }
-        else if (DService.ObjectTable.LocalPlayer is { } localPlayer)
-        {
-            players.TryAdd(localPlayer.EntityID,
-                           new PlayerPayload
-                           {
-                               Name       = localPlayer.Name.ToString(),
-                               Server     = localPlayer.HomeWorld.Value.Name.ToString(),
-                               JobID      = localPlayer.ClassJob.RowId,
-                               Level      = localPlayer.Level,
-                               DeathCount = 0
-                           });
+            players[p.EntityId] = new PlayerPayload
+            {
+                Name       = p.Name,
+                Server     = p.Server,
+                JobId      = p.JobId,
+                Level      = p.Level,
+                DeathCount = 0
+            };
         }
     }
 
@@ -199,10 +187,10 @@ public class FightContext
         // progress
         var progress = new FightProgressPayload
         {
-            PhaseID    = (uint)Math.Max(phaseIndex, 0),
-            SubphaseID = (uint)Math.Max(subphaseIndex, 0),
-            EnemyID    = enemyID,
-            EnemyHP    = enemyHP
+            PhaseId    = (uint)Math.Max(phaseIndex, 0),
+            SubphaseId = (uint)Math.Max(subphaseIndex, 0),
+            EnemyId    = PluginContext.EnemyDataId,
+            EnemyHp    = enemyHp
         };
 
         // payload
@@ -210,7 +198,7 @@ public class FightContext
         {
             StartTime = startTime,
             Duration  = duration,
-            ZoneID    = dutyConfig.ZoneID,
+            ZoneId    = dutyConfig.ZoneId,
             Players   = players.Values.ToList(),
             IsClear   = isClear,
             Progress  = progress
@@ -236,10 +224,10 @@ public class FightContext
 
         // clear listeners & checkpoints
         listenerManager.Clear();
-        completedCheckpoints.Clear();
+        completedCheckpoints = [];
 
         // variables
-        variables.Clear();
+        variables = [];
         foreach (var vars in dutyConfig.Variables)
             variables[vars.Name] = vars.Initial;
 
@@ -250,18 +238,18 @@ public class FightContext
         UpdateContext();
     }
 
-    private void EnterPhase(int phaseID)
+    private void EnterPhase(int phaseId)
     {
         // phase transition
-        var phase = dutyConfig.Timeline.Phases[phaseID];
-        phaseIndex    = phaseID;
+        var phase = dutyConfig.Timeline.Phases[phaseId];
+        phaseIndex    = phaseId;
         subphaseIndex = -1;
 
         // clear triggers
         listenerManager.Clear();
 
         // reset checkpoints
-        completedCheckpoints.Clear();
+        completedCheckpoints = [];
 
         // mechanics
         // from checkpoints
@@ -282,7 +270,7 @@ public class FightContext
             listenerManager.Register(new ListenerState(mechanic, mechanic.Trigger));
 
         // enemy
-        enemyID = phase.TargetID;
+        PluginContext.EnemyDataId = phase.TargetId;
 
         // update context (phase change)
         UpdateContext();

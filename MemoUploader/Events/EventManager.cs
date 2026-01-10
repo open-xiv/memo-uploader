@@ -11,6 +11,7 @@ public class EventManager
     private ActionManager?    actionService;
     private CombatantManager? combatantService;
     private StatusManager?    statusService;
+    private HpManager?        hpService;
 
     // event
     public event Action<IEvent>? OnEvent;
@@ -18,7 +19,7 @@ public class EventManager
     public void Init()
     {
         // GENERAL EVENTS
-        DService.ClientState.TerritoryChanged += OnTerritoryChanged;
+        DService.Instance().ClientState.TerritoryChanged += OnTerritoryChanged;
 
         // ACTION EVENTS
         actionService = new ActionManager(RaiseEvent);
@@ -32,20 +33,24 @@ public class EventManager
         statusService = new StatusManager(RaiseEvent);
         statusService.Init();
 
+        // ENEMY HP EVENTS
+        hpService = new HpManager(RaiseEvent);
+        hpService.Init();
+
         // DUTY EVENTS
-        DService.DutyState.DutyStarted     += OnDutyStarted;
-        DService.DutyState.DutyRecommenced += OnDutyRecommenced;
-        DService.DutyState.DutyCompleted   += OnDutyCompleted;
-        DService.DutyState.DutyWiped       += OnDutyWiped;
+        DService.Instance().DutyState.DutyStarted     += OnDutyStarted;
+        DService.Instance().DutyState.DutyRecommenced += OnDutyRecommenced;
+        DService.Instance().DutyState.DutyCompleted   += OnDutyCompleted;
+        DService.Instance().DutyState.DutyWiped       += OnDutyWiped;
 
         // CONDITION EVENTS
-        DService.Condition.ConditionChange += OnConditionChange;
+        DService.Instance().Condition.ConditionChange += OnConditionChange;
     }
 
     public void Uninit()
     {
         // GENERAL EVENTS
-        DService.ClientState.TerritoryChanged -= OnTerritoryChanged;
+        DService.Instance().ClientState.TerritoryChanged -= OnTerritoryChanged;
 
         // ACTION EVENTS
         actionService?.Uninit();
@@ -56,14 +61,17 @@ public class EventManager
         // STATUS EVENTS
         statusService?.Uninit();
 
+        // ENEMY HP EVENTS
+        hpService?.Uninit();
+
         // DUTY EVENTS
-        DService.DutyState.DutyStarted     -= OnDutyStarted;
-        DService.DutyState.DutyRecommenced -= OnDutyRecommenced;
-        DService.DutyState.DutyCompleted   -= OnDutyCompleted;
-        DService.DutyState.DutyWiped       -= OnDutyWiped;
+        DService.Instance().DutyState.DutyStarted     -= OnDutyStarted;
+        DService.Instance().DutyState.DutyRecommenced -= OnDutyRecommenced;
+        DService.Instance().DutyState.DutyCompleted   -= OnDutyCompleted;
+        DService.Instance().DutyState.DutyWiped       -= OnDutyWiped;
 
         // CONDITION EVENTS
-        DService.Condition.ConditionChange -= OnConditionChange;
+        DService.Instance().Condition.ConditionChange -= OnConditionChange;
     }
 
     private void RaiseEvent(IEvent e) =>

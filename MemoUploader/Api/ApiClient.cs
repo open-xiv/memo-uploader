@@ -62,21 +62,21 @@ public static class ApiClient
         try
         {
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-            if (DService.Condition[ConditionFlag.DutyRecorderPlayback])
+            if (DService.Instance().Condition[ConditionFlag.DutyRecorderPlayback])
             {
-                DService.Log.Debug($"{content.ReadAsStringAsync().Result}");
-                DService.Log.Debug("fight record uploaded canceled [playback mode]");
+                DService.Instance().Log.Debug($"{content.ReadAsStringAsync().Result}");
+                DService.Instance().Log.Debug("fight record uploaded canceled [playback mode]");
                 return true;
             }
 
             var resp = await client.PostAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.Created)
             {
-                DService.Log.Debug("fight record uploaded successfully");
+                DService.Instance().Log.Debug("fight record uploaded successfully");
                 return true;
             }
-            DService.Log.Warning($"fight record upload failed: {resp.StatusCode}");
-            DService.Log.Warning(resp.Content.ReadAsStringAsync().Result);
+            DService.Instance().Log.Warning($"fight record upload failed: {resp.StatusCode}");
+            DService.Instance().Log.Warning(resp.Content.ReadAsStringAsync().Result);
             return false;
         }
         catch (Exception) { return false; }
