@@ -24,6 +24,21 @@ jobs:
               with:
                   dotnet-version: 10.0.x
 
+            - name: Generate Auth File
+              shell: pwsh
+              env:
+                  SECRET_KEY: ${{ secrets.API_AUTH_KEY }}
+              run: |
+                  $filePath = "${{ github.workspace }}\MemoUploader\Api\ApiSecrets.cs"
+                  $content = @"
+                  namespace MemoUploader.Api;
+                  public class ApiSecrets
+                  {
+                      public const string AuthKey = "$env:SECRET_KEY";
+                  }
+                  "@
+                  Set-Content -Path $filePath -Value $content
+
             - name: Install Dalamud
               shell: pwsh
               run: |
