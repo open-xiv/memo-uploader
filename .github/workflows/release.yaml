@@ -1,0 +1,52 @@
+name: Build Release
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+
+jobs:
+    build:
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  submodules: recursive
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: 10.0.x
+
+            - name: Restore
+              run: dotnet restore
+
+            - name: Build (Release)
+              run: dotnet build -c Release --no-restore
+
+            - name: Read Version
+              id: version
+              shell: pwsh
+              run: |
+                  [xml]$csproj = Get-Content MemoUploader/MemoUploader.csproj
+                  $version = $csproj.Project.PropertyGroup.Version
+                  echo "version=$version" >> $env:GITHUB_OUTPUT
+
+            - name: Create git tag
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git tag v${{ steps.version.outputs.version }}
+                  git push origin v${{ steps.version.outputs.version }}
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ steps.version.outputs.version }}
+                  files: MemoUploader/bin/Release/MemoUploader/latest.zip
