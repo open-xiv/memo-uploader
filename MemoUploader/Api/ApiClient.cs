@@ -12,7 +12,7 @@ namespace MemoUploader.Api;
 
 public static class ApiClient
 {
-    private static readonly HttpClient client;
+    private static readonly HttpClient Client;
 
     private const string AssetsUrl = "https://assets.sumemo.dev";
     private const string ApiUrl    = "https://api.sumemo.dev";
@@ -20,14 +20,14 @@ public static class ApiClient
 
     static ApiClient()
     {
-        client = new HttpClient
+        Client = new HttpClient
         {
             DefaultRequestVersion = HttpVersion.Version30,
             DefaultVersionPolicy  = HttpVersionPolicy.RequestVersionOrLower
         };
 
-        client.DefaultRequestHeaders.Add("X-Auth-Key", AuthKey);
-        client.Timeout = TimeSpan.FromSeconds(5);
+        Client.DefaultRequestHeaders.Add("X-Auth-Key", AuthKey);
+        Client.Timeout = TimeSpan.FromSeconds(5);
     }
 
     /// <summary>
@@ -40,7 +40,7 @@ public static class ApiClient
         var url = $"{AssetsUrl}/duty/{zoneId}?use-cache=false";
         try
         {
-            var resp = await client.GetAsync(url);
+            var resp = await Client.GetAsync(url);
             if (!resp.IsSuccessStatusCode)
                 return null;
 
@@ -69,7 +69,7 @@ public static class ApiClient
                 return true;
             }
 
-            var resp = await client.PostAsync(url, content);
+            var resp = await Client.PostAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.Created)
             {
                 DService.Instance().Log.Debug("fight record uploaded successfully");
