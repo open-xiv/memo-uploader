@@ -222,6 +222,9 @@ public class FightContext
         phaseIndex    = 0;
         subphaseIndex = -1;
 
+        // enemy
+        PluginContext.EnemyDataId = 0;
+
         // clear listeners & checkpoints
         listenerManager.Clear();
         completedCheckpoints = [];
@@ -244,6 +247,9 @@ public class FightContext
         var phase = dutyConfig.Timeline.Phases[phaseId];
         phaseIndex    = phaseId;
         subphaseIndex = -1;
+
+        // enemy
+        PluginContext.EnemyDataId = phase.TargetId;
 
         // clear triggers
         listenerManager.Clear();
