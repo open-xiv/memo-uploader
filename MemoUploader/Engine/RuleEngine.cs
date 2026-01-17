@@ -33,7 +33,7 @@ public class RuleEngine
         {
             fightContext?.CompletedSnap();
 
-            var dutyConfig = await ApiClient.FetchDutyConfigAsync(tc.ZoneId);
+            var dutyConfig = await ApiClient.FetchDuty(tc.ZoneId);
             fightContext = dutyConfig is not null ? new FightContext(dutyConfig) : null;
         }
 

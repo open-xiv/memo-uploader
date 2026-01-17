@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Conditions;
 using MemoUploader.Models;
@@ -14,9 +16,14 @@ public static class ApiClient
 {
     private static readonly HttpClient Client;
 
-    private const string AssetsUrl = "https://assets.sumemo.dev";
-    private const string ApiUrl    = "https://api.sumemo.dev";
-    private const string AuthKey   = ApiSecrets.AuthKey;
+    private static readonly string[] AssetUrls =
+    {
+        "https://assets.sumemo.dev",
+        "https://haku.diemoe.net/assets"
+    };
+
+    private const string ApiUrl  = "https://api.sumemo.dev";
+    private const string AuthKey = ApiSecrets.AuthKey;
 
     static ApiClient()
     {
@@ -30,32 +37,36 @@ public static class ApiClient
         Client.Timeout = TimeSpan.FromSeconds(5);
     }
 
-    /// <summary>
-    ///     fetch duty configuration from the API.
-    /// </summary>
-    /// <param name="zoneId">zone id of territory</param>
-    /// <returns>duty config if successful, otherwise null</returns>
-    public static async Task<DutyConfig?> FetchDutyConfigAsync(uint zoneId)
+    public static async Task<DutyConfig?> FetchDuty(uint zoneId)
     {
-        var url = $"{AssetsUrl}/duty/{zoneId}?use-cache=false";
+        var tasks = AssetUrls.Select(assetUrl => FetchDutyFromUrl(assetUrl, zoneId)).ToList();
+        while (tasks.Count > 0)
+        {
+            var complete = await Task.WhenAny(tasks);
+            var result   = await complete;
+            if (result is not null)
+                return result;
+            tasks.Remove(complete);
+        }
+        return null;
+    }
+
+    public static async Task<DutyConfig?> FetchDutyFromUrl(string assetUrl, uint zoneId)
+    {
+        var       url = $"{assetUrl}/duty/{zoneId}";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         try
         {
-            var resp = await Client.GetAsync(url);
+            var resp = await Client.GetAsync(url, cts.Token);
             if (!resp.IsSuccessStatusCode)
                 return null;
 
-            var content = await resp.Content.ReadAsStringAsync();
-            var duty    = JsonConvert.DeserializeObject<DutyConfig>(content);
-            return duty;
+            var content = await resp.Content.ReadAsStringAsync(cts.Token);
+            return JsonConvert.DeserializeObject<DutyConfig>(content);
         }
         catch (Exception) { return null; }
     }
 
-    /// <summary>
-    ///     upload fight record to the API.
-    /// </summary>
-    /// <param name="payload">fight record payload</param>
-    /// <returns>true if successful, otherwise false</returns>
     public static async Task<bool> UploadFightRecordAsync(FightRecordPayload payload)
     {
         const string url = $"{ApiUrl}/fight";
