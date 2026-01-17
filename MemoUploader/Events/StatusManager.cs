@@ -8,14 +8,14 @@ public class StatusManager(Action<IEvent> eventRaiser)
 {
     public void Init()
     {
-        PlayerStatusManager.Instance().RegGain(OnStatusAppliedHook);
-        PlayerStatusManager.Instance().RegLose(OnStatusRemovedHook);
+        CharacterStatusManager.Instance().RegGain(OnStatusAppliedHook);
+        CharacterStatusManager.Instance().RegLose(OnStatusRemovedHook);
     }
 
     public void Uninit()
     {
-        PlayerStatusManager.Instance().Unreg(OnStatusAppliedHook);
-        PlayerStatusManager.Instance().Unreg(OnStatusRemovedHook);
+        CharacterStatusManager.Instance().Unreg(OnStatusAppliedHook);
+        CharacterStatusManager.Instance().Unreg(OnStatusRemovedHook);
     }
 
     private void OnStatusAppliedHook
