@@ -1,23 +1,24 @@
 using System;
 using System.Linq;
 using Dalamud.Plugin.Services;
-using MemoUploader.Models;
+using MemoEngine;
+using MemoEngine.Models;
 
 
 namespace MemoUploader.Events;
 
-public class HpManager(Action<IEvent> eventRaiser)
+public class HpManager
 {
-    public void Init() => FrameworkManager.Instance().Reg(OnFrameworkUpdate, throttleMS: 200);
+    public void Init() => FrameworkManager.Instance().Reg(OnFrameworkUpdate, 200);
 
     public void Uninit() => FrameworkManager.Instance().Unreg(OnFrameworkUpdate);
 
     private void OnFrameworkUpdate(IFramework _)
     {
-        if (PluginContext.Lifecycle is null || PluginContext.EnemyDataId == 0)
+        if (Context.Lifecycle is EngineState.Idle || Context.EnemyDataId == 0)
             return;
 
-        if (DService.Instance().ObjectTable.FirstOrDefault(x => x.DataID == PluginContext.EnemyDataId) is IBattleChara enemy)
-            eventRaiser(new EnemyHpChanged(PluginContext.EnemyDataId, enemy.CurrentHp, enemy.MaxHp));
+        if (DService.Instance().ObjectTable.FirstOrDefault(x => x.DataID == Context.EnemyDataId) is IBattleChara enemy)
+            Event.Combatant.RaiseHpUpdated(DateTimeOffset.UtcNow, enemy.DataID, enemy.CurrentHp, enemy.MaxHp);
     }
 }

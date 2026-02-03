@@ -5,8 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Conditions;
-using MemoUploader.Models;
+using MemoEngine.Models;
 using Newtonsoft.Json;
 
 
@@ -16,13 +15,12 @@ public static class ApiClient
 {
     private static readonly HttpClient Client;
 
-    private static readonly string[] AssetUrls =
-    {
-        "https://assets.sumemo.dev",
-        "https://haku.diemoe.net/assets"
-    };
+    private static readonly string[] ApiUrls =
+    [
+        "https://api.sumemo.dev",
+        "https://sumemo.diemoe.net"
+    ];
 
-    private const string ApiUrl  = "https://api.sumemo.dev";
     private const string AuthKey = ApiSecrets.AuthKey;
 
     static ApiClient()
@@ -37,57 +35,31 @@ public static class ApiClient
         Client.Timeout = TimeSpan.FromSeconds(5);
     }
 
-    public static async Task<DutyConfig?> FetchDuty(uint zoneId)
+    public static async Task<bool> UploadFight(FightRecordPayload payload)
     {
-        var tasks = AssetUrls.Select(assetUrl => FetchDutyFromUrl(assetUrl, zoneId)).ToList();
+        var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+        var tasks   = ApiUrls.Select(apiUrl => UploadFightToUrl(apiUrl, content)).ToList();
         while (tasks.Count > 0)
         {
             var complete = await Task.WhenAny(tasks);
             var result   = await complete;
-            if (result is not null)
-                return result;
+            if (result)
+                return true;
             tasks.Remove(complete);
         }
-        return null;
+        return false;
     }
 
-    public static async Task<DutyConfig?> FetchDutyFromUrl(string assetUrl, uint zoneId)
+    private static async Task<bool> UploadFightToUrl(string apiUrl, StringContent content)
     {
-        var       url = $"{assetUrl}/duty/{zoneId}";
+        var       url = $"{apiUrl}/fight";
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         try
         {
-            var resp = await Client.GetAsync(url, cts.Token);
-            if (!resp.IsSuccessStatusCode)
-                return null;
-
-            var content = await resp.Content.ReadAsStringAsync(cts.Token);
-            return JsonConvert.DeserializeObject<DutyConfig>(content);
-        }
-        catch (Exception) { return null; }
-    }
-
-    public static async Task<bool> UploadFightRecordAsync(FightRecordPayload payload)
-    {
-        const string url = $"{ApiUrl}/fight";
-        try
-        {
-            var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-            if (DService.Instance().Condition[ConditionFlag.DutyRecorderPlayback])
-            {
-                DService.Instance().Log.Debug($"{content.ReadAsStringAsync().Result}");
-                DService.Instance().Log.Debug("fight record uploaded canceled [playback mode]");
+            var resp = await Client.PostAsync(url, content, cts.Token);
+            if (resp.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK)
                 return true;
-            }
-
-            var resp = await Client.PostAsync(url, content);
-            if (resp.StatusCode == HttpStatusCode.Created)
-            {
-                DService.Instance().Log.Debug("fight record uploaded successfully");
-                return true;
-            }
-            DService.Instance().Log.Warning($"fight record upload failed: {resp.StatusCode}");
-            DService.Instance().Log.Warning(resp.Content.ReadAsStringAsync().Result);
+            await resp.Content.ReadAsStringAsync(cts.Token);
             return false;
         }
         catch (Exception) { return false; }
