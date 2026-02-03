@@ -1,20 +1,14 @@
 ﻿using System;
-using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Windowing;
-using MemoUploader.Models;
+using MemoEngine;
+using MemoEngine.Models;
 
 
 namespace MemoUploader.Windows;
 
 public class MainWindow : Window, IDisposable
 {
-    // window
-    private readonly Tab currentTab = Tab.Status;
-
-    // event recorder
-    private string eventFilter = string.Empty;
-
     public MainWindow() : base(
         "酥卷记录仪##sumemo-uploader-main",
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoBackground
@@ -30,18 +24,6 @@ public class MainWindow : Window, IDisposable
 
     public void Dispose() { }
 
-    // public override void PreDraw()
-    // {
-    //     ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 20.0f);
-    //     ImGui.PushStyleColor(ImGuiCol.WindowBg, KnownColor.LightPink.ToVector4() with { W = 1f });
-    // }
-    //
-    // public override void PostDraw()
-    // {
-    //     ImGui.PopStyleColor(1);
-    //     ImGui.PopStyleVar(1);
-    // }
-
     public override void Draw()
     {
         using var rounding   = ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, 15.0f);
@@ -55,14 +37,14 @@ public class MainWindow : Window, IDisposable
 
         ImGui.Spacing();
 
-        if (currentTab != Tab.Status || currentTab == Tab.Status && PluginContext.Lifecycle == EngineState.InProgress)
-        {
-            using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(24, 24)))
-            using (ImRaii.PushColor(ImGuiCol.Border, KnownColor.LightSkyBlue.ToVector4()))
-            using (ImRaii.PushColor(ImGuiCol.ChildBg, KnownColor.LightSkyBlue.ToVector4() with { W = 0.4f }))
-            using (ImRaii.Child("ContentChild", Vector2.Zero, true))
-                DrawContent();
-        }
+        // if (currentTab != Tab.Status || currentTab == Tab.Status && Context.Lifecycle == EngineState.Recording)
+        // {
+        //     using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, new Vector2(24, 24)))
+        //     using (ImRaii.PushColor(ImGuiCol.Border, KnownColor.LightSkyBlue.ToVector4()))
+        //     using (ImRaii.PushColor(ImGuiCol.ChildBg, KnownColor.LightSkyBlue.ToVector4() with { W = 0.4f }))
+        //     using (ImRaii.Child("ContentChild", Vector2.Zero, true))
+        //         DrawContent();
+        // }
     }
 
     private void DrawHeader()
@@ -73,40 +55,21 @@ public class MainWindow : Window, IDisposable
             IsOpen = false;
     }
 
-    private void DrawContent()
-    {
-        switch (currentTab)
-        {
-            case Tab.Status:
-                DrawProgressTab();
-                break;
-            case Tab.Settings:
-                DrawSettingsTab();
-                break;
-            case Tab.EventQueue:
-                DrawEventQueueTab();
-                break;
-            default:
-                throw new ArgumentOutOfRangeException();
-        }
-    }
-
     private void DrawEngineState()
     {
         string     message;
         string     detail;
         KnownColor color;
 
-        switch (PluginContext.Lifecycle)
+        switch (Context.Lifecycle)
         {
-            case EngineState.InProgress:
+            case EngineState.Recording:
                 message = "解析中";
                 detail  = "正在记录战斗数据";
                 color   = KnownColor.DarkSeaGreen;
                 break;
 
-            case EngineState.Ready:
-            case EngineState.Completed:
+            case EngineState.WaitingStart:
                 message = "准备就绪";
                 detail  = "等待战斗开始";
                 color   = KnownColor.DarkGoldenrod;
@@ -122,103 +85,6 @@ public class MainWindow : Window, IDisposable
         DrawText(message, color.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
         ImGui.SameLine();
         DrawText(detail, secondaryBtnNormal, KnownColor.Beige.ToVector4());
-    }
-
-    private void DrawSettingsTab() { }
-
-    private void DrawProgressTab()
-    {
-        if (PluginContext.CurrentPhase == "N/A")
-        {
-            DrawText("当前副本暂无细粒度划分", KnownColor.CornflowerBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
-            return;
-        }
-
-        DrawText(PluginContext.CurrentPhase, KnownColor.RoyalBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
-        if (!string.IsNullOrEmpty(PluginContext.CurrentSubphase))
-        {
-            ImGui.SameLine();
-            DrawText(PluginContext.CurrentSubphase, KnownColor.CornflowerBlue.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
-        }
-
-        ImGui.Spacing();
-
-        var first = true;
-        foreach (var (name, completed) in PluginContext.Checkpoints)
-        {
-            var textWidth = ImGui.CalcTextSize(name).X + 16.0f * 2;
-            if (!first)
-                ImGui.SameLine();
-            first = false;
-            if (ImGui.GetContentRegionAvail().X < textWidth)
-                ImGui.NewLine();
-            var statusColor = completed ? KnownColor.DarkSeaGreen : KnownColor.DarkSalmon;
-            DrawText(name, statusColor.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
-        }
-
-        // if (PluginContext.VariableStats.Count <= 0)
-        //     return;
-        //
-        // ImGui.Spacing();
-        //
-        // first = true;
-        // foreach (var (key, value) in PluginContext.VariableStats)
-        // {
-        //     var textWidth = ImGui.CalcTextSize($"{key}: {value}").X + 16.0f * 2;
-        //     if (!first)
-        //         ImGui.SameLine();
-        //     first = false;
-        //     if (ImGui.GetContentRegionAvail().X < textWidth)
-        //         ImGui.NewLine();
-        //     DrawText($"{key}: {value}", KnownColor.SlateGray.ToVector4() with { W = 0.8f }, KnownColor.Beige.ToVector4());
-        // }
-    }
-
-    private void DrawEventQueueTab()
-    {
-        ImGui.InputTextWithHint("##sumemo-event-filter", "筛选事件", ref eventFilter, 100);
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        ImGui.BeginChild("EventHistoryChild", Vector2.Zero);
-        {
-            if (ImGui.BeginTable("EventLogTable", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit))
-            {
-                ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 90);
-                ImGui.TableSetupColumn("Category", ImGuiTableColumnFlags.WidthFixed, 150);
-                ImGui.TableSetupColumn("Message", ImGuiTableColumnFlags.WidthStretch);
-
-                // filter events
-                var events = PluginContext.EventHistory;
-                var showEvents = string.IsNullOrWhiteSpace(eventFilter)
-                                     ? events
-                                     : events.Where(log =>
-                                                        log.Category.Contains(eventFilter, StringComparison.OrdinalIgnoreCase) ||
-                                                        log.Message.Contains(eventFilter, StringComparison.OrdinalIgnoreCase)
-                                     ).ToList();
-
-                foreach (var evt in showEvents)
-                {
-                    ImGui.TableNextRow();
-
-                    // time
-                    ImGui.TableNextColumn();
-                    ImGui.Text(evt.Time.ToLocalTime().ToString("HH:mm:ss.fff"));
-
-                    // category
-                    ImGui.TableNextColumn();
-                    ImGui.Text(evt.Category);
-
-                    // message
-                    ImGui.TableNextColumn();
-                    ImGui.Text(evt.Message);
-                }
-                ImGui.EndTable();
-            }
-        }
-        ImGui.EndChild();
     }
 
     #region Colors
@@ -277,11 +143,4 @@ public class MainWindow : Window, IDisposable
     }
 
     #endregion
-
-    private enum Tab
-    {
-        Status,
-        Settings,
-        EventQueue
-    }
 }

@@ -1,9 +1,12 @@
-﻿using Dalamud.Game.Command;
+﻿using System.Threading.Tasks;
+using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using MemoUploader.Engine;
+using MemoEngine;
+using MemoEngine.Models;
+using MemoUploader.Api;
 using MemoUploader.Events;
 using MemoUploader.Windows;
 
@@ -15,7 +18,6 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/memo";
 
     // service
-    private readonly RuleEngine   engine;
     private readonly EventManager eventService;
 
     // plugin windows
@@ -26,15 +28,12 @@ public sealed class Plugin : IDalamudPlugin
         Config = pi.GetPluginConfig() as Configuration ?? new Configuration();
         DService.Init(pi);
 
-        // engine
-        engine = new RuleEngine();
-
         // services
         eventService = new EventManager();
         eventService.Init();
 
-        // link engine and services
-        eventService.OnEvent += engine.PostEvent;
+        // engine
+        Context.OnFightFinalized += UploadFight;
 
         // window
         MainWindow = new MainWindow();
@@ -47,6 +46,8 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.OpenMainUi += ToggleMainUI;
     }
 
+    private static void UploadFight(FightRecordPayload payload) => _ = Task.Run(async () => await ApiClient.UploadFight(payload));
+
     public void Dispose()
     {
         // command
@@ -56,8 +57,8 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
 
-        // unlink engine and services
-        eventService.OnEvent -= engine.PostEvent;
+        // engine
+        Context.OnFightFinalized -= UploadFight;
 
         // services
         eventService.Uninit();

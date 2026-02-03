@@ -1,10 +1,11 @@
 ﻿using System;
-using MemoUploader.Models;
+using MemoEngine;
+using MemoEngine.Models;
 
 
 namespace MemoUploader.Events;
 
-public class StatusManager(Action<IEvent> eventRaiser)
+public class StatusManager
 {
     public void Init()
     {
@@ -28,10 +29,10 @@ public class StatusManager(Action<IEvent> eventRaiser)
         ulong        sourceId
     )
     {
-        if (PluginContext.Lifecycle is null)
+        if (Context.Lifecycle is EngineState.Idle)
             return;
 
-        try { eventRaiser(new StatusApplied(player.EntityID, statusId)); }
+        try { Event.Status.RaiseApplied(DateTimeOffset.UtcNow, player.EntityID, statusId); }
         catch
         {
             // ignored
@@ -40,10 +41,10 @@ public class StatusManager(Action<IEvent> eventRaiser)
 
     private void OnStatusRemovedHook(IBattleChara player, ushort statusId, ushort param, ushort stackCount, ulong sourceId)
     {
-        if (PluginContext.Lifecycle is null)
+        if (Context.Lifecycle is EngineState.Idle)
             return;
 
-        try { eventRaiser(new StatusRemoved(player.EntityID, statusId)); }
+        try { Event.Status.RaiseRemoved(DateTimeOffset.UtcNow, player.EntityID, statusId); }
         catch
         {
             // ignored

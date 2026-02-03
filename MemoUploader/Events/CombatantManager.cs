@@ -2,20 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Plugin.Services;
-using MemoUploader.Models;
+using MemoEngine;
+using MemoEngine.Models;
 using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
 
 namespace MemoUploader.Events;
 
-public class CombatantManager(Action<IEvent> eventRaiser)
+public class CombatantManager
 {
     private readonly List<IGameObject>                lastCombatants = [];
     private readonly Dictionary<uint, CombatantState> lastStates     = [];
 
     private record CombatantState(bool IsTargetable, bool IsDead);
 
-    public void Init() => FrameworkManager.Instance().Reg(OnFrameworkUpdate, throttleMS: 200);
+    public void Init() => FrameworkManager.Instance().Reg(OnFrameworkUpdate, 500);
 
     public void Uninit()
     {
@@ -25,7 +26,7 @@ public class CombatantManager(Action<IEvent> eventRaiser)
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        if (PluginContext.Lifecycle is null)
+        if (Context.Lifecycle is EngineState.Idle)
             return;
 
         // combatants
@@ -33,11 +34,11 @@ public class CombatantManager(Action<IEvent> eventRaiser)
 
         // spawn
         foreach (var obj in currentCombatants.Except(lastCombatants))
-            eventRaiser(new CombatantSpawned(obj.DataID));
+            Event.Combatant.RaiseSpawned(DateTimeOffset.UtcNow, obj.DataID);
 
         // destroy
         foreach (var obj in lastCombatants.Except(currentCombatants))
-            eventRaiser(new CombatantDestroyed(obj.DataID));
+            Event.Combatant.RaiseDestroyed(DateTimeOffset.UtcNow, obj.DataID);
 
         // update combatants
         lastCombatants.Clear();
@@ -59,10 +60,10 @@ public class CombatantManager(Action<IEvent> eventRaiser)
             switch (lastState.IsTargetable)
             {
                 case true when !currentState.IsTargetable:
-                    eventRaiser(new CombatantBecameUntargetable(currentState.DataID));
+                    Event.Combatant.RaiseBecameTargetable(DateTimeOffset.UtcNow, currentState.DataID);
                     break;
                 case false when currentState.IsTargetable:
-                    eventRaiser(new CombatantBecameTargetable(currentState.DataID));
+                    Event.Combatant.RaiseBecameUntargetable(DateTimeOffset.UtcNow, currentState.DataID);
                     break;
             }
 
@@ -70,7 +71,7 @@ public class CombatantManager(Action<IEvent> eventRaiser)
             if (currentState.ObjectKind is not ObjectKind.Player || lastState.IsDead || !currentState.IsDead)
                 continue;
 
-            eventRaiser(new PlayerDied(currentState.EntityID));
+            Event.General.RaisePlayerDied(DateTimeOffset.UtcNow, currentState.EntityID);
         }
 
         // update states

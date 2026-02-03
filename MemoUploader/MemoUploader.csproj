@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Dalamud.CN.NET.Sdk/14.0.1">
     <PropertyGroup>
-        <Version>7.4.5</Version>
+        <Version>7.4.7.1</Version>
         <Author>HaKu</Author>
         <Name>SuMemo Uploader</Name>
         <InternalName>SuMemoUploader</InternalName>
@@ -25,5 +25,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\OmenTools\OmenTools.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MemoEngine" Version="1.0.7"/>
     </ItemGroup>
 </Project>

@@ -2,13 +2,14 @@
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using MemoUploader.Models;
+using MemoEngine;
+using MemoEngine.Models;
 using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
 
 namespace MemoUploader.Events;
 
-public class ActionManager(Action<IEvent> eventRaiser)
+public class ActionManager
 {
     public void Init()
     {
@@ -24,11 +25,11 @@ public class ActionManager(Action<IEvent> eventRaiser)
 
     private void OnActionStart(bool result, IBattleChara player, ActionType type, uint actionId, nint a4, float rotation, float a6)
     {
-        if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
+        if (player.ObjectKind is not ObjectKind.BattleNpc || Context.Lifecycle is EngineState.Idle)
             return;
 
         if (DService.Instance().ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
-            eventRaiser(new ActionStarted(obj.DataID, actionId));
+            Event.Action.RaiseStarted(DateTimeOffset.UtcNow, obj.DataID, actionId);
     }
 
     private void OnActionComplete
@@ -46,10 +47,10 @@ public class ActionManager(Action<IEvent> eventRaiser)
         int          a10
     )
     {
-        if (player.ObjectKind is not ObjectKind.BattleNpc || PluginContext.Lifecycle is null)
+        if (player.ObjectKind is not ObjectKind.BattleNpc || Context.Lifecycle is EngineState.Idle)
             return;
 
         if (DService.Instance().ObjectTable.SearchByEntityID(player.EntityID) is { } obj)
-            eventRaiser(new ActionCompleted(obj.DataID, actionId));
+            Event.Action.RaiseCompleted(DateTimeOffset.UtcNow, obj.DataID, actionId);
     }
 }
