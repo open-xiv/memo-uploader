@@ -37,8 +37,8 @@ public static class ApiClient
 
     public static async Task<bool> UploadFight(FightRecordPayload payload)
     {
-        var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-        var tasks   = ApiUrls.Select(apiUrl => UploadFightToUrl(apiUrl, content)).ToList();
+        var json  = JsonConvert.SerializeObject(payload);
+        var tasks = ApiUrls.Select(apiUrl => UploadFightToUrl(apiUrl, json)).ToList();
         while (tasks.Count > 0)
         {
             var complete = await Task.WhenAny(tasks);
@@ -50,10 +50,11 @@ public static class ApiClient
         return false;
     }
 
-    private static async Task<bool> UploadFightToUrl(string apiUrl, StringContent content)
+    private static async Task<bool> UploadFightToUrl(string apiUrl, string json)
     {
-        var       url = $"{apiUrl}/fight";
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var       url     = $"{apiUrl}/fight";
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var cts     = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         try
         {
             var resp = await Client.PostAsync(url, content, cts.Token);
