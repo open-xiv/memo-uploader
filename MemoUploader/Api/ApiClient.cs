@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,6 +33,8 @@ public static class ApiClient
         };
 
         Client.DefaultRequestHeaders.Add("X-Auth-Key", AuthKey);
+        Client.DefaultRequestHeaders.Add("X-Client-Name", "MemoUploader");
+        Client.DefaultRequestHeaders.Add("X-Client-Version", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0");
         Client.Timeout = TimeSpan.FromSeconds(5);
     }
 
