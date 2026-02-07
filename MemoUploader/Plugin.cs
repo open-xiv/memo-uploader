@@ -33,7 +33,7 @@ public sealed class Plugin : IDalamudPlugin
         eventService.Init();
 
         // engine
-        Context.OnFightFinalized += UploadFight;
+        Context.OnFightFinalized += OnFightFinalized;
 
         // window
         MainWindow = new MainWindow();
@@ -46,7 +46,7 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.OpenMainUi += ToggleMainUI;
     }
 
-    private static void UploadFight(FightRecordPayload payload) => _ = Task.Run(async () => await ApiClient.UploadFight(payload));
+    private static void OnFightFinalized(FightRecordPayload payload) => _ = Task.Run(async () => await ApiClient.UploadFight(payload));
 
     public void Dispose()
     {
@@ -58,7 +58,7 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow.Dispose();
 
         // engine
-        Context.OnFightFinalized -= UploadFight;
+        Context.OnFightFinalized -= OnFightFinalized;
 
         // services
         eventService.Uninit();
