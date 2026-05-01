@@ -46,7 +46,7 @@ jobs:
                   $targetDir = "${{ github.workspace }}\dalamud_lib"
                   New-Item -ItemType Directory -Force -Path $targetDir
 
-                  $url = "https://github.com/AtmoOmen/Dalamud/releases/latest/download/latest.7z"
+                  $url = "https://github.com/Dalamud-DailyRoutines/Dalamud/releases/latest/download/latest.7z"
                   $archive = "dalamud.7z"
 
                   Invoke-WebRequest -Uri $url -OutFile $archive
