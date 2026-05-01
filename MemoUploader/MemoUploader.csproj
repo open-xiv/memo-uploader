@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Dalamud.CN.NET.Sdk/14.0.1">
     <PropertyGroup>
-        <Version>7.4.7.3</Version>
+        <Version>7.5.0.0</Version>
         <Author>HaKu</Author>
         <Name>SuMemo Uploader</Name>
         <InternalName>SuMemoUploader</InternalName>
@@ -28,6 +28,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MemoEngine" Version="1.0.7"/>
+        <PackageReference Include="MemoEngine" Version="2.0.0"/>
     </ItemGroup>
 </Project>
