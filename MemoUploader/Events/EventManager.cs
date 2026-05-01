@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.DutyState;
 using MemoEngine;
 using MemoEngine.Models;
 
@@ -70,13 +71,13 @@ public class EventManager
         DService.Instance().Condition.ConditionChange -= OnConditionChange;
     }
 
-    private void OnTerritoryChanged(ushort zoneId) =>
-        Event.General.RaiseTerritoryChanged(DateTimeOffset.UtcNow, zoneId);
+    private void OnTerritoryChanged(uint zoneId) =>
+        Event.General.RaiseTerritoryChanged(DateTimeOffset.UtcNow, (ushort)zoneId);
 
-    private void OnDutyCompleted(object? sender, ushort e) =>
+    private void OnDutyCompleted(IDutyStateEventArgs args) =>
         Event.General.RaiseDutyCompleted(DateTimeOffset.UtcNow);
 
-    private void OnDutyWiped(object? sender, ushort e) =>
+    private void OnDutyWiped(IDutyStateEventArgs args) =>
         Event.General.RaiseDutyWiped(DateTimeOffset.UtcNow);
 
     private void OnConditionChange(ConditionFlag flag, bool value)

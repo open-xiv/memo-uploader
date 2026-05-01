@@ -33,7 +33,7 @@ public static class ApiClient
         };
 
         Client.DefaultRequestHeaders.Add("X-Auth-Key", AuthKey);
-        Client.DefaultRequestHeaders.Add("X-Client-Name", "MemoUploader");
+        Client.DefaultRequestHeaders.Add("X-Client-Name", "SuMemo.Uploader");
         Client.DefaultRequestHeaders.Add("X-Client-Version", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0");
         Client.Timeout = TimeSpan.FromSeconds(5);
     }

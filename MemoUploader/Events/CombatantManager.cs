@@ -51,7 +51,7 @@ public class CombatantManager
             // multiple entities can share the same dataId (boss adds, etc.) — collapse
             // to "is ANY entity with this dataId targetable" since predicates only care
             // about the dataId.
-            currentSeen[obj.DataId] = currentSeen.TryGetValue(obj.DataId, out var prev)
+            currentSeen[obj.DataID] = currentSeen.TryGetValue(obj.DataID, out var prev)
                                           ? prev || obj.IsTargetable
                                           : obj.IsTargetable;
         }
