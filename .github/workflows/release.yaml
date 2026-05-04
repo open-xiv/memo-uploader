@@ -67,7 +67,7 @@ jobs:
               shell: pwsh
               run: |
                   [xml]$csproj = Get-Content MemoUploader/MemoUploader.csproj
-                  $version = $csproj.Project.PropertyGroup.Version
+                  $version = "$($csproj.Project.PropertyGroup.Version)".Trim()
                   echo "version=$version" >> $env:GITHUB_OUTPUT
 
             - name: Create Git Tag
