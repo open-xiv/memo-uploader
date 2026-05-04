@@ -82,3 +82,25 @@ jobs:
               with:
                   tag_name: v${{ steps.version.outputs.version }}
                   files: MemoUploader/bin/Release/MemoUploader/latest.zip
+
+            - name: Generate App Token
+              id: app-token
+              uses: actions/create-github-app-token@v2
+              with:
+                  app-id: ${{ secrets.APP_ID }}
+                  private-key: ${{ secrets.APP_PRIVATE_KEY }}
+                  owner: ${{ github.repository_owner }}
+                  repositories: 'dalamud-plugins'
+
+            - name: Notify dalamud-plugins
+              uses: peter-evans/repository-dispatch@v3
+              with:
+                  token: ${{ steps.app-token.outputs.token }}
+                  repository: open-xiv/dalamud-plugins
+                  event-type: plugin-released
+                  client-payload: |
+                      {
+                          "internal_name": "MemoUploader",
+                          "version": "${{ steps.version.outputs.version }}",
+                          "download_url": "https://github.com/open-xiv/memo-uploader/releases/download/v${{ steps.version.outputs.version }}/latest.zip"
+                      }
