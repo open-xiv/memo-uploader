@@ -16,9 +16,9 @@
       },
       "MemoEngine": {
         "type": "Direct",
-        "requested": "[2.0.0, )",
-        "resolved": "2.0.0",
-        "contentHash": "HwmRX7vrQ8Ohya0PG//6UOB8FqmkNJ5Ci5jBpc3xk85Yv+PVOT+SvqzUltL+7rE/Poo5oGqDRZDlNFOlXCOzlQ==",
+        "requested": "[2.1.0, )",
+        "resolved": "2.1.0",
+        "contentHash": "dGG5RziRDchDy2DrhPfShb6l59KA7ujhemTu7q6w2QElOYLdrCsCLYShp8SM+6fBMRyFiONOZBOe2xtv+9Z12Q==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.4"
         }

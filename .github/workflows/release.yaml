@@ -12,6 +12,8 @@ permissions:
 jobs:
     build:
         runs-on: windows-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
 
         steps:
             - name: Checkout
@@ -104,3 +106,26 @@ jobs:
                           "version": "${{ steps.version.outputs.version }}",
                           "download_url": "https://github.com/open-xiv/memo-uploader/releases/download/v${{ steps.version.outputs.version }}/latest.zip"
                       }
+
+    notify:
+        needs: [build]
+        if: always()
+        runs-on: ubuntu-latest
+        steps:
+            - name: Compute status
+              id: s
+              run: |
+                  if [[ "${{ needs.build.result }}" == "success" ]]; then
+                    echo "status=success" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "status=failure" >> "$GITHUB_OUTPUT"
+                  fi
+            - uses: open-xiv/gha-actions/notify-deploy@v1
+              with:
+                  status: ${{ steps.s.outputs.status }}
+                  service: memo-uploader
+                  kind: release
+                  version: v${{ needs.build.outputs.version }}
+                  cluster: dalamud
+                  build: ${{ needs.build.result }}
+                  webhook_token: ${{ secrets.GHA_WEBHOOK_TOKEN }}

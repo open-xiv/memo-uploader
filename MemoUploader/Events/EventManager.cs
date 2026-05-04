@@ -72,7 +72,16 @@ public class EventManager
     }
 
     private void OnTerritoryChanged(uint zoneId) =>
-        Event.General.RaiseTerritoryChanged(DateTimeOffset.UtcNow, (ushort)zoneId);
+        // Pass observed roulette / popped-party tags along with the
+        // territory event so the engine can bake them into the eventual
+        // FightRecordPayload. Read at duty entry (most reliable window —
+        // ContentsFinder.QueueState is still InContent here); the engine
+        // caches and forwards them to the next DutyCompleted/Wiped, then
+        // resets on the subsequent TerritoryChanged.
+        Event.General.RaiseTerritoryChanged(
+            DateTimeOffset.UtcNow,
+            (ushort)zoneId,
+            Tags.RouletteTags.Build());
 
     private void OnDutyCompleted(IDutyStateEventArgs args) =>
         Event.General.RaiseDutyCompleted(DateTimeOffset.UtcNow);
