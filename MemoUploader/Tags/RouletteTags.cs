@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using FFXIVClientStructs.FFXIV.Client.Enums;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
 
@@ -11,51 +10,72 @@ namespace MemoUploader.Tags;
 ///     tag form. Engine-side stays game-agnostic — this file is the only
 ///     place in the codebase that knows about FFXIV's queue UI internals.
 ///
-///     Read at TerritoryChanged because that's the most reliable window:
-///     queue state is still <c>InContent</c>, RouletteId / popped flags
-///     are fresh, and the cached read survives all the way to the
-///     subsequent DutyCompleted via <c>FightRecordPayload.Tags</c>
-///     passthrough.
+///     Leak-prevention strategy mirrors DailyRoutines'
+///     DungeonLoggerUploader (Assist/DungeonLoggerUploader.cs:111): we
+///     don't gate on <c>QueueState</c> at all — instead we gate on whether
+///     the destination zone itself is a duty zone, by checking
+///     <c>GameMain.CurrentContentFinderConditionId</c> (zero in towns,
+///     wilderness, housing, etc.). This is the cleanest discriminator
+///     because:
+///
+///       - Player queueing for a roulette and walking around town:
+///         <c>QueuedContentRouletteId</c> is set but CFC is 0 → no tag.
+///       - Player accepting a pop and entering the duty: CFC flips to
+///         non-zero on the destination → tag attaches.
+///       - Multi-zone duties (Crystal Tower etc.): every sub-zone has
+///         CFC != 0 → tag re-emitted on each TerritoryChanged so the
+///         engine's Recorder keeps it across zone resets.
+///       - Exit back to town: destination CFC is 0 → no tag.
+///
+///     QueueState was the previous gate but proved fragile — it's only
+///     <c>Accepted</c> for an instant during loading and the timing
+///     relative to the TerritoryChanged event isn't guaranteed.
 /// </summary>
 internal static unsafe class RouletteTags
 {
-    /// <summary>
-    /// Returns null if the player isn't in a roulette / popped party
-    /// (no tags worth attaching). Engine accepts null and clears
-    /// observed tags for the new zone.
-    /// </summary>
     public static IReadOnlyList<string>? Build()
     {
+        // Mirrors DungeonLoggerUploader.OnZoneChanged:111 — destination
+        // must be a duty zone (CFC != 0) before we even peek at the queue.
+        var cfc = GameState.ContentFinderCondition;
+        if (cfc == 0)
+        {
+            Plugin.Log.Info("[Roulette] consume: empty reason=cfc-zero");
+            return null;
+        }
+
         var cf = ContentsFinder.Instance();
-        if (cf == null) return null;
+        if (cf == null)
+        {
+            Plugin.Log.Info($"[Roulette] consume: empty reason=contents-finder-null cfc={cfc}");
+            return null;
+        }
 
         var info = cf->GetQueueInfo();
-        if (info == null || info->QueueState != ContentsFinderQueueState.InContent)
+        if (info == null)
+        {
+            Plugin.Log.Info($"[Roulette] consume: empty reason=queue-info-null cfc={cfc}");
             return null;
+        }
 
-        var tags = new List<string>();
+        var rid   = info->QueuedContentRouletteId;
+        var state = info->QueueState;
 
-        // 0 = direct entry (not from a roulette). Skip the roulette tag
-        // but the popped-party flags below may still apply (unrestricted
-        // / min ilvl / etc are picked at duty finder time regardless of
-        // roulette).
-        if (info->QueuedContentRouletteId != 0)
-            tags.Add("roulette:" + RouletteName(info->QueuedContentRouletteId));
+        if (rid == 0)
+        {
+            Plugin.Log.Info($"[Roulette] consume: empty reason=direct-entry cfc={cfc} state={state}");
+            return null;
+        }
 
-        if (info->PoppedContentIsInProgress)        tags.Add("in-progress");
-        if (info->PoppedContentIsUnrestrictedParty) tags.Add("unrestricted-party");
-        if (info->PoppedContentIsMinimalIL)         tags.Add("min-ilvl");
-        if (info->PoppedContentIsLevelSync)         tags.Add("level-sync");
-        if (info->PoppedContentIsSilenceEcho)       tags.Add("echo-off");
-        if (info->PoppedContentIsExplorerMode)      tags.Add("explorer");
-
-        return tags.Count > 0 ? tags : null;
+        var tag = "roulette:" + RouletteName(rid);
+        Plugin.Log.Info($"[Roulette] consume: tag={tag} cfc={cfc} id={rid} state={state}");
+        return new List<string> { tag };
     }
 
     /// <summary>
     /// Maps ContentRoulette excel row id to the lowercased-hyphenated
     /// name memo-server's tag whitelist accepts (see
-    /// utils/ContentRoulette mirror in memo-server).
+    /// memo-server/service/fight_validate.go:clientTagRegistry).
     /// </summary>
     private static string RouletteName(byte id) => id switch
     {

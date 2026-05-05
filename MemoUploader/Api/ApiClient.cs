@@ -40,7 +40,8 @@ public static class ApiClient
 
     public static async Task<bool> UploadFight(FightRecordPayload payload)
     {
-        var json  = JsonConvert.SerializeObject(payload);
+        var json = JsonConvert.SerializeObject(payload);
+        Plugin.Log.Info($"[Upload] body: {json}");
         var tasks = ApiUrls.Select(apiUrl => UploadFightToUrl(apiUrl, json)).ToList();
         while (tasks.Count > 0)
         {
@@ -62,10 +63,18 @@ public static class ApiClient
         {
             var resp = await Client.PostAsync(url, content, cts.Token);
             if (resp.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK)
+            {
+                Plugin.Log.Info($"[Upload] success: url={apiUrl}");
                 return true;
-            await resp.Content.ReadAsStringAsync(cts.Token);
+            }
+            var err = await resp.Content.ReadAsStringAsync(cts.Token);
+            Plugin.Log.Warning($"[Upload] failure: url={apiUrl} status={(int)resp.StatusCode} reason={err}");
             return false;
         }
-        catch (Exception) { return false; }
+        catch (Exception e)
+        {
+            Plugin.Log.Warning($"[Upload] failure: url={apiUrl} reason=exception message={e.Message}");
+            return false;
+        }
     }
 }

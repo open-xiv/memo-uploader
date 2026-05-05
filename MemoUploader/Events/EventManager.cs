@@ -71,23 +71,28 @@ public class EventManager
         DService.Instance().Condition.ConditionChange -= OnConditionChange;
     }
 
-    private void OnTerritoryChanged(uint zoneId) =>
+    private void OnTerritoryChanged(uint zoneId)
+    {
         // Pass observed roulette / popped-party tags along with the
         // territory event so the engine can bake them into the eventual
-        // FightRecordPayload. Read at duty entry (most reliable window —
-        // ContentsFinder.QueueState is still InContent here); the engine
-        // caches and forwards them to the next DutyCompleted/Wiped, then
-        // resets on the subsequent TerritoryChanged.
-        Event.General.RaiseTerritoryChanged(
-            DateTimeOffset.UtcNow,
-            (ushort)zoneId,
-            Tags.RouletteTags.Build());
+        // FightRecordPayload. The engine caches and forwards them to the
+        // next DutyCompleted/Wiped, then resets on the next TerritoryChanged.
+        var tags = Tags.RouletteTags.Build();
+        Plugin.Log.Info($"[Zone] change: id={zoneId} tags=[{(tags is null ? "" : string.Join(",", tags))}]");
+        Event.General.RaiseTerritoryChanged(DateTimeOffset.UtcNow, (ushort)zoneId, tags);
+    }
 
-    private void OnDutyCompleted(IDutyStateEventArgs args) =>
+    private void OnDutyCompleted(IDutyStateEventArgs args)
+    {
+        Plugin.Log.Info("[Duty] completed");
         Event.General.RaiseDutyCompleted(DateTimeOffset.UtcNow);
+    }
 
-    private void OnDutyWiped(IDutyStateEventArgs args) =>
+    private void OnDutyWiped(IDutyStateEventArgs args)
+    {
+        Plugin.Log.Info("[Duty] wiped");
         Event.General.RaiseDutyWiped(DateTimeOffset.UtcNow);
+    }
 
     private void OnConditionChange(ConditionFlag flag, bool value)
     {
@@ -95,9 +100,18 @@ public class EventManager
             return;
 
         if (value)
-            Event.General.RaiseCombatOptIn(DateTimeOffset.UtcNow, GetPartySnapshots());
+        {
+            var partySnapshots = GetPartySnapshots();
+            Plugin.Log.Info($"[Combat] start: members={partySnapshots.Count}");
+            foreach (var kv in partySnapshots)
+                Plugin.Log.Info($"[Party] member: name={kv.Value.Name} server={kv.Value.Server} id={kv.Key} job={kv.Value.JobId}");
+            Event.General.RaiseCombatOptIn(DateTimeOffset.UtcNow, partySnapshots);
+        }
         else
+        {
+            Plugin.Log.Info("[Combat] end");
             Event.General.RaiseCombatOptOut(DateTimeOffset.UtcNow);
+        }
     }
 
     private static Dictionary<uint, PlayerPayload> GetPartySnapshots()
