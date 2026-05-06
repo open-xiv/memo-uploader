@@ -11,7 +11,6 @@ namespace MemoUploader.Events;
 
 public class EventManager
 {
-    // service
     private ActionManager?    actionService;
     private CombatantManager? combatantService;
     private StatusManager?    statusService;
@@ -19,64 +18,43 @@ public class EventManager
 
     public void Init()
     {
-        // GENERAL EVENTS
         DService.Instance().ClientState.TerritoryChanged += OnTerritoryChanged;
 
-        // ACTION EVENTS
         actionService = new ActionManager();
         actionService.Init();
 
-        // COMBATANT EVENTS
         combatantService = new CombatantManager();
         combatantService.Init();
 
-        // STATUS EVENTS
         statusService = new StatusManager();
         statusService.Init();
 
-        // ENEMY HP EVENTS
         hpService = new HpManager();
         hpService.Init();
 
-        // DUTY EVENTS
         DService.Instance().DutyState.DutyCompleted += OnDutyCompleted;
         DService.Instance().DutyState.DutyWiped     += OnDutyWiped;
 
-        // CONDITION EVENTS
         DService.Instance().Condition.ConditionChange += OnConditionChange;
     }
 
     public void Uninit()
     {
-        // GENERAL EVENTS
         DService.Instance().ClientState.TerritoryChanged -= OnTerritoryChanged;
 
-        // ACTION EVENTS
         actionService?.Uninit();
-
-        // COMBATANT EVENTS
         combatantService?.Uninit();
-
-        // STATUS EVENTS
         statusService?.Uninit();
-
-        // ENEMY HP EVENTS
         hpService?.Uninit();
 
-        // DUTY EVENTS
         DService.Instance().DutyState.DutyCompleted -= OnDutyCompleted;
         DService.Instance().DutyState.DutyWiped     -= OnDutyWiped;
 
-        // CONDITION EVENTS
         DService.Instance().Condition.ConditionChange -= OnConditionChange;
     }
 
     private void OnTerritoryChanged(uint zoneId)
     {
-        // Pass observed roulette / popped-party tags along with the
-        // territory event so the engine can bake them into the eventual
-        // FightRecordPayload. The engine caches and forwards them to the
-        // next DutyCompleted/Wiped, then resets on the next TerritoryChanged.
         var tags = Tags.RouletteTags.Build();
         Plugin.Log.Info($"[Zone] change: id={zoneId} tags=[{(tags is null ? "" : string.Join(",", tags))}]");
         Event.General.RaiseTerritoryChanged(DateTimeOffset.UtcNow, (ushort)zoneId, tags);

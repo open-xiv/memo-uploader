@@ -17,10 +17,8 @@ public sealed class Plugin : IDalamudPlugin
 {
     private const string CommandName = "/memo";
 
-    // service
     private readonly EventManager eventService;
 
-    // plugin windows
     public readonly WindowSystem WindowSystem = new("酥卷");
 
     public Plugin(IDalamudPluginInterface pi)
@@ -28,18 +26,14 @@ public sealed class Plugin : IDalamudPlugin
         Config = pi.GetPluginConfig() as Configuration ?? new Configuration();
         DService.Init(pi);
 
-        // services
         eventService = new EventManager();
         eventService.Init();
 
-        // engine
         Context.OnFightFinalized += OnFightFinalized;
 
-        // window
         MainWindow = new MainWindow();
         WindowSystem.AddWindow(MainWindow);
 
-        // command
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand) { HelpMessage = "打开当前进度窗口" });
 
         pi.UiBuilder.Draw       += DrawUI;
@@ -50,17 +44,13 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
-        // command
         CommandManager.RemoveHandler(CommandName);
 
-        // window
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
 
-        // engine
         Context.OnFightFinalized -= OnFightFinalized;
 
-        // services
         eventService.Uninit();
 
         DService.Uninit();

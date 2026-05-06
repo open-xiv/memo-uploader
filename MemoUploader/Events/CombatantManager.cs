@@ -43,31 +43,24 @@ public class CombatantManager
 
         var now = DateTimeOffset.UtcNow;
 
-        // -- BattleNpc lifecycle diff ------------------------------------------------
         var currentSeen = new Dictionary<uint, bool>();
         foreach (var obj in DService.Instance().ObjectTable)
         {
             if (obj.ObjectKind is not ObjectKind.BattleNpc) continue;
-            // multiple entities can share the same dataId (boss adds, etc.) — collapse
-            // to "is ANY entity with this dataId targetable" since predicates only care
-            // about the dataId.
+            // multiple entities can share the same dataId (boss adds) —
+            // collapse to "is ANY entity with this dataId targetable"
             currentSeen[obj.DataID] = currentSeen.TryGetValue(obj.DataID, out var prev)
                                           ? prev || obj.IsTargetable
                                           : obj.IsTargetable;
         }
 
-        // entries that were present before but disappeared this frame → Destroyed
         foreach (var dataId in lastSeen.Keys.Where(k => !currentSeen.ContainsKey(k)).ToList())
             Event.Combatant.RaiseDestroyed(now, dataId);
 
-        // diff each currently-seen dataId
         foreach (var (dataId, isTargetable) in currentSeen)
         {
             if (!lastSeen.TryGetValue(dataId, out var wasTargetable))
             {
-                // first time we see this dataId this fight → Spawned, plus an initial
-                // targetable signal if applicable (catches the case where the entity
-                // was already targetable before the framework callback hooked in)
                 Event.Combatant.RaiseSpawned(now, dataId);
                 if (isTargetable) Event.Combatant.RaiseBecameTargetable(now, dataId);
                 continue;
@@ -81,7 +74,6 @@ public class CombatantManager
         lastSeen.Clear();
         foreach (var kv in currentSeen) lastSeen[kv.Key] = kv.Value;
 
-        // -- party death detection ---------------------------------------------------
         var currentAlive = new Dictionary<uint, bool>();
         if (DService.Instance().PartyList.Length >= 1)
             currentAlive = DService.Instance().PartyList.ToDictionary(
