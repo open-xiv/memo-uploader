@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Dalamud.CN.NET.Sdk/15.0.0">
     <PropertyGroup>
-        <Version>7.5.3.2</Version>
+        <Version>7.5.3.3</Version>
         <Author>HaKu</Author>
         <Name>SuMemo Uploader</Name>
         <InternalName>SuMemoUploader</InternalName>
