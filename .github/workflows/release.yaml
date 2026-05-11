@@ -17,13 +17,13 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
                   submodules: recursive
 
             - name: Setup .NET
-              uses: actions/setup-dotnet@v4
+              uses: actions/setup-dotnet@v5
               with:
                   dotnet-version: 10.0.x
 
@@ -80,14 +80,14 @@ jobs:
                   git push origin v${{ steps.version.outputs.version }}
 
             - name: Create GitHub Release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   tag_name: v${{ steps.version.outputs.version }}
                   files: MemoUploader/bin/Release/MemoUploader/latest.zip
 
             - name: Generate App Token
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.APP_ID }}
                   private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -95,7 +95,7 @@ jobs:
                   repositories: 'dalamud-plugins'
 
             - name: Notify dalamud-plugins
-              uses: peter-evans/repository-dispatch@v3
+              uses: peter-evans/repository-dispatch@v4
               with:
                   token: ${{ steps.app-token.outputs.token }}
                   repository: open-xiv/dalamud-plugins
