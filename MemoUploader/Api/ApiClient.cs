@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -24,6 +24,9 @@ public static class ApiClient
 
     private const string AuthKey = ApiSecrets.AuthKey;
 
+    // chosen by the /status race; volatile so cross-thread reads see the latest write.
+    private static volatile string preferredUrl = ApiUrls[0];
+
     static ApiClient()
     {
         Client = new HttpClient
@@ -36,22 +39,63 @@ public static class ApiClient
         Client.DefaultRequestHeaders.Add("X-Client-Name", "SuMemo.Uploader");
         Client.DefaultRequestHeaders.Add("X-Client-Version", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0");
         Client.Timeout = TimeSpan.FromSeconds(5);
+
+        _ = Task.Run(RaceForFastestAsync);
     }
 
     public static async Task<bool> UploadFight(FightRecordPayload payload)
     {
         var json = JsonConvert.SerializeObject(payload);
         Plugin.Log.Info($"[Upload] body: {json}");
-        var tasks = ApiUrls.Select(apiUrl => UploadFightToUrl(apiUrl, json)).ToList();
-        while (tasks.Count > 0)
+
+        var primary = preferredUrl;
+        if (await UploadFightToUrl(primary, json))
+            return true;
+
+        var fallback = ApiUrls.FirstOrDefault(u => u != primary);
+        if (fallback != null && await UploadFightToUrl(fallback, json))
         {
-            var complete = await Task.WhenAny(tasks);
-            var result   = await complete;
-            if (result)
-                return true;
-            tasks.Remove(complete);
+            // primary failed but fallback worked — re-race to refresh the preference.
+            _ = Task.Run(RaceForFastestAsync);
+            return true;
         }
         return false;
+    }
+
+    private static async Task RaceForFastestAsync()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        var tasks = ApiUrls.Select(url => ProbeStatusAsync(url, cts.Token)).ToList();
+        while (tasks.Count > 0)
+        {
+            var done   = await Task.WhenAny(tasks);
+            var winner = await done;
+            if (winner != null)
+            {
+                if (preferredUrl != winner)
+                {
+                    Plugin.Log.Info($"[ApiClient] preferred URL: {winner}");
+                    preferredUrl = winner;
+                }
+                cts.Cancel();
+                return;
+            }
+            tasks.Remove(done);
+        }
+        Plugin.Log.Warning($"[ApiClient] /status race: no endpoint reachable; keeping {preferredUrl}");
+    }
+
+    private static async Task<string?> ProbeStatusAsync(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var resp = await Client.GetAsync($"{url}/status", ct);
+            return resp.IsSuccessStatusCode ? url : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static async Task<bool> UploadFightToUrl(string apiUrl, string json)
