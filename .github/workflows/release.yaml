@@ -30,7 +30,7 @@ jobs:
             - name: Generate Auth File
               shell: pwsh
               env:
-                  SECRET_KEY: ${{ secrets.API_AUTH_KEY }}
+                  SECRET_KEY: ${{ secrets.MEMO_API_DALAMUD_KEY }}
               run: |
                   $filePath = "${{ github.workspace }}\MemoUploader\Api\ApiSecrets.cs"
                   $content = @"
