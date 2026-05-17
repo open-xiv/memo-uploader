@@ -89,8 +89,8 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.APP_ID }}
-                  private-key: ${{ secrets.APP_PRIVATE_KEY }}
+                  app-id: ${{ secrets.GH_APP_ID }}
+                  private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
                   repositories: 'dalamud-plugins'
 
@@ -126,6 +126,7 @@ jobs:
                   service: memo-uploader
                   kind: release
                   version: v${{ needs.build.outputs.version }}
-                  cluster: dalamud
+                  cluster: ''
                   build: ${{ needs.build.result }}
-                  webhook_token: ${{ secrets.GHA_WEBHOOK_TOKEN }}
+                  webhook_url: ${{ secrets.BOT_WEBHOOK_URL }}
+                  webhook_token: ${{ secrets.BOT_WEBHOOK_TOKEN }}
