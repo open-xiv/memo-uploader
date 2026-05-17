@@ -126,7 +126,6 @@ jobs:
                   service: memo-uploader
                   kind: release
                   version: v${{ needs.build.outputs.version }}
-                  cluster: ''
                   build: ${{ needs.build.result }}
                   webhook_url: ${{ secrets.BOT_WEBHOOK_URL }}
                   webhook_token: ${{ secrets.BOT_WEBHOOK_TOKEN }}
